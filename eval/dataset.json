@@ -1,0 +1,112 @@
+[
+  {
+    "input": "what time is it?",
+    "expected_output": "I don't have access to real-time information, so I can't tell you the exact time.",
+    "emotional_label": 0.05
+  },
+  {
+    "input": "what is 2 + 2?",
+    "expected_output": "2 + 2 equals 4.",
+    "emotional_label": 0.0
+  },
+  {
+    "input": "what is the capital of France?",
+    "expected_output": "The capital of France is Paris.",
+    "emotional_label": 0.0
+  },
+  {
+    "input": "how many days are in a week?",
+    "expected_output": "There are 7 days in a week.",
+    "emotional_label": 0.0
+  },
+  {
+    "input": "how do I open a file in Python?",
+    "expected_output": "You can open a file in Python using the built-in open() function.",
+    "emotional_label": 0.05
+  },
+  {
+    "input": "what color is the sky during the day?",
+    "expected_output": "The sky appears blue during the day due to Rayleigh scattering.",
+    "emotional_label": 0.02
+  },
+  {
+    "input": "who wrote Romeo and Juliet?",
+    "expected_output": "Romeo and Juliet was written by William Shakespeare.",
+    "emotional_label": 0.05
+  },
+  {
+    "input": "convert 100 degrees Celsius to Fahrenheit",
+    "expected_output": "100 degrees Celsius is equal to 212 degrees Fahrenheit.",
+    "emotional_label": 0.0
+  },
+  {
+    "input": "what is the speed of light?",
+    "expected_output": "The speed of light in a vacuum is approximately 299,792,458 metres per second.",
+    "emotional_label": 0.0
+  },
+  {
+    "input": "how do you make pasta?",
+    "expected_output": "To make pasta, boil salted water, add the pasta, and cook according to package instructions.",
+    "emotional_label": 0.02
+  },
+  {
+    "input": "I need some advice on my career",
+    "expected_output": "I'd be happy to help. What aspect of your career would you like guidance on?",
+    "emotional_label": 0.35
+  },
+  {
+    "input": "I'm a bit stressed about my presentation tomorrow",
+    "expected_output": "It's natural to feel nervous before a presentation. Preparation and practice can really help.",
+    "emotional_label": 0.4
+  },
+  {
+    "input": "I made a mistake at work today and I'm embarrassed",
+    "expected_output": "Everyone makes mistakes. What matters is how you learn from it and move forward.",
+    "emotional_label": 0.45
+  },
+  {
+    "input": "can you help me understand why I feel unmotivated?",
+    "expected_output": "Lack of motivation can have many causes. Let's explore what might be driving yours.",
+    "emotional_label": 0.35
+  },
+  {
+    "input": "I'm feeling a bit overwhelmed with everything lately",
+    "expected_output": "I hear you. It can help to break things down into smaller, manageable steps.",
+    "emotional_label": 0.45
+  },
+  {
+    "input": "I just lost my job today",
+    "expected_output": "I'm really sorry to hear that. Losing a job is a difficult and stressful experience.",
+    "emotional_label": 0.85
+  },
+  {
+    "input": "my father was just diagnosed with cancer",
+    "expected_output": "I'm so sorry. A cancer diagnosis in the family is incredibly hard to bear.",
+    "emotional_label": 0.95
+  },
+  {
+    "input": "I'm having a panic attack right now and I don't know what to do",
+    "expected_output": "Try to focus on your breathing — slow, deep breaths. Inhale for 4 counts, hold for 4, exhale for 4.",
+    "emotional_label": 0.92
+  },
+  {
+    "input": "I feel completely worthless and hopeless",
+    "expected_output": "I hear how much pain you're in right now. Please know that you matter and help is available.",
+    "emotional_label": 0.95
+  },
+  {
+    "input": "I just got promoted — I'm so excited and happy!",
+    "expected_output": "Congratulations! That's wonderful news. You should be very proud of yourself.",
+    "emotional_label": 0.75
+  },
+  {
+    "input": "my long-term relationship just ended after 5 years",
+    "expected_output": "I'm sorry. The end of a long relationship is a significant loss. Give yourself time to grieve.",
+    "emotional_label": 0.87
+  },
+  {
+    "input": "I'm terrified I'm going to lose my home because I can't pay the mortgage",
+    "expected_output": "That sounds incredibly stressful. There are financial counselling services that can help you explore your options.",
+    "emotional_label": 0.9
+  }
+]

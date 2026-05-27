@@ -23,11 +23,6 @@ services:
     environment:
       - CHROMA_SERVER_AUTHN_CREDENTIALS_FILE=
       - ANONYMIZED_TELEMETRY=false
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   ollama:
     image: ollama/ollama:latest
@@ -36,12 +31,9 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    command: ["serve", "--listen", "0.0.0.0:11434"]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/v1/health" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    command: ["serve"]
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
 
 volumes:
   redis_data:

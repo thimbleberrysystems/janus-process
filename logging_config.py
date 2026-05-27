@@ -36,6 +36,10 @@ def setup_logging() -> logging.Logger:
         force=True,  # override any previously installed handlers
     )
 
+    # Silence noisy third-party HTTP loggers
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
     logger = logging.getLogger("janus")
     logger.info(
         "Logging initialised. LangSmith tracing: %s | project: %s",

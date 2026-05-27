@@ -93,7 +93,7 @@ class TestIsDuplicate:
 
 
 # ---------------------------------------------------------------------------
-# consolidate() unit tests
+# consolidate(summarize=False, ) unit tests
 # ---------------------------------------------------------------------------
 
 FIVE_MESSAGES = [f"memory item {i}" for i in range(5)]
@@ -103,40 +103,40 @@ class TestConsolidate:
     def test_consolidate_writes_to_ltm(self, chroma, fake_embed):
         """5 new STM messages → all 5 written to LTM."""
         with patch("memory.consolidator.get_short_term_memory", return_value=FIVE_MESSAGES):
-            count = consolidate(chroma_client=chroma, embedding_fn=fake_embed)
+            count = consolidate(summarize=False, chroma_client=chroma, embedding_fn=fake_embed)
         assert count == 5
 
     def test_consolidate_writes_correct_count(self, chroma, fake_embed):
         """Returned count matches actual documents in ChromaDB."""
         with patch("memory.consolidator.get_short_term_memory", return_value=FIVE_MESSAGES):
-            count = consolidate(chroma_client=chroma, embedding_fn=fake_embed)
+            count = consolidate(summarize=False, chroma_client=chroma, embedding_fn=fake_embed)
         col = chroma.get_or_create_collection(DEFAULT_COLLECTION)
         assert col.count() == count
 
     def test_deduplication_skips_existing(self, chroma, fake_embed):
         """Running consolidation twice: second pass writes 0 new documents."""
         with patch("memory.consolidator.get_short_term_memory", return_value=FIVE_MESSAGES):
-            first = consolidate(chroma_client=chroma, embedding_fn=fake_embed)
-            second = consolidate(chroma_client=chroma, embedding_fn=fake_embed)
+            first = consolidate(summarize=False, chroma_client=chroma, embedding_fn=fake_embed)
+            second = consolidate(summarize=False, chroma_client=chroma, embedding_fn=fake_embed)
         assert first == 5
         assert second == 0
 
     def test_deduplication_collection_count_does_not_double(self, chroma, fake_embed):
         """ChromaDB collection count stays the same after re-consolidation."""
         with patch("memory.consolidator.get_short_term_memory", return_value=FIVE_MESSAGES):
-            consolidate(chroma_client=chroma, embedding_fn=fake_embed)
+            consolidate(summarize=False, chroma_client=chroma, embedding_fn=fake_embed)
             before = chroma.get_or_create_collection(DEFAULT_COLLECTION).count()
-            consolidate(chroma_client=chroma, embedding_fn=fake_embed)
+            consolidate(summarize=False, chroma_client=chroma, embedding_fn=fake_embed)
             after = chroma.get_or_create_collection(DEFAULT_COLLECTION).count()
         assert before == after == 5
 
     def test_replay_window_respected(self, chroma, fake_embed):
-        """consolidate() passes *window* as n to get_short_term_memory."""
+        """consolidate(summarize=False, ) passes *window* as n to get_short_term_memory."""
         ten_messages = [f"msg {i}" for i in range(10)]
         with patch(
             "memory.consolidator.get_short_term_memory", return_value=ten_messages
         ) as mock_stm:
-            count = consolidate(window=10, chroma_client=chroma, embedding_fn=fake_embed)
+            count = consolidate(summarize=False, window=10, chroma_client=chroma, embedding_fn=fake_embed)
         mock_stm.assert_called_once_with(10, session_id=ANY, ttl=ANY)
         assert count == 10
 
@@ -146,7 +146,7 @@ class TestConsolidate:
             "memory.consolidator.get_short_term_memory",
             return_value=["the test message"],
         ):
-            consolidate(chroma_client=chroma, embedding_fn=fake_embed)
+            consolidate(summarize=False, chroma_client=chroma, embedding_fn=fake_embed)
         results = search_ltm_with_metadata(
             "test message",
             DEFAULT_COLLECTION,
@@ -164,7 +164,7 @@ class TestConsolidate:
         with patch(
             "memory.consolidator.get_short_term_memory", return_value=[text]
         ):
-            consolidate(chroma_client=chroma, embedding_fn=fake_embed)
+            consolidate(summarize=False, chroma_client=chroma, embedding_fn=fake_embed)
         results = search_ltm_with_metadata(
             text,
             DEFAULT_COLLECTION,
@@ -179,7 +179,7 @@ class TestConsolidate:
     def test_empty_stm_does_nothing(self, chroma, fake_embed):
         """Empty STM → 0 written, ChromaDB collection stays empty."""
         with patch("memory.consolidator.get_short_term_memory", return_value=[]):
-            count = consolidate(chroma_client=chroma, embedding_fn=fake_embed)
+            count = consolidate(summarize=False, chroma_client=chroma, embedding_fn=fake_embed)
         assert count == 0
         col = chroma.get_or_create_collection(DEFAULT_COLLECTION)
         assert col.count() == 0
@@ -187,16 +187,16 @@ class TestConsolidate:
     def test_empty_stm_does_not_raise(self, chroma, fake_embed):
         """Consolidating an empty STM must never raise an exception."""
         with patch("memory.consolidator.get_short_term_memory", return_value=[]):
-            consolidate(chroma_client=chroma, embedding_fn=fake_embed)  # no exception
+            consolidate(summarize=False, chroma_client=chroma, embedding_fn=fake_embed)  # no exception
 
     def test_partial_deduplication(self, chroma, fake_embed):
         """3 old + 2 new messages → only 2 written on second pass."""
         first_batch = [f"old msg {i}" for i in range(3)]
         combined = first_batch + ["new msg A", "new msg B"]
         with patch("memory.consolidator.get_short_term_memory", return_value=first_batch):
-            consolidate(chroma_client=chroma, embedding_fn=fake_embed)
+            consolidate(summarize=False, chroma_client=chroma, embedding_fn=fake_embed)
         with patch("memory.consolidator.get_short_term_memory", return_value=combined):
-            count = consolidate(chroma_client=chroma, embedding_fn=fake_embed)
+            count = consolidate(summarize=False, chroma_client=chroma, embedding_fn=fake_embed)
         assert count == 2
 
 

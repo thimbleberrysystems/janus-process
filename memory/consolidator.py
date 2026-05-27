@@ -2,8 +2,9 @@
 memory/consolidator.py — STM → LTM Memory Consolidator.
 
 Implements systems consolidation: drains the Redis short-term buffer into the
-ChromaDB long-term store, skipping texts that are already present (by SHA-256
-hash), then logs the result.
+ChromaDB long-term store as a single LLM-generated summary (or raw, when
+``summarize=False``), skipping batches whose content hash is already stored,
+then logs the result.
 
 Public surface
 --------------
@@ -12,9 +13,6 @@ maybe_consolidate(state)  — call consolidate() only when state["should_consoli
                             is True.
 start_scheduler(interval) — start a background APScheduler job for periodic
                             consolidation.
-
-All functions accept optional ``embedding_fn`` and ``chroma_client`` kwargs so
-unit tests can inject in-memory alternatives without live services.
 """
 
 from __future__ import annotations
@@ -24,16 +22,24 @@ import logging
 from typing import Any
 
 from langchain_core.embeddings import Embeddings
+from langchain_core.messages import HumanMessage
 
-from config import SESSION_ID, STM_TTL
+from config import CONSOLIDATION_WINDOW, SESSION_ID, STM_TTL
 from memory.long_term import _http_client, add_to_ltm
 from memory.short_term import get_short_term_memory
 from models.brain_state import BrainState
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_WINDOW: int = 50
 DEFAULT_COLLECTION: str = "episodic"
+
+_SUMMARY_PROMPT = (
+    "You are a memory consolidation system. Summarize the following conversation "
+    "messages into a single concise episodic memory that preserves key facts, "
+    "decisions, and context. Be factual and concise.\n\n"
+    "Messages:\n{messages}\n\n"
+    "Episodic memory summary:"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -46,13 +52,7 @@ def _text_hash(text: str) -> str:
 
 
 def _is_duplicate(text_hash: str, collection_name: str, chroma_client: Any) -> bool:
-    """Return True if a document with ``hash == text_hash`` already exists.
-
-    Uses the raw ChromaDB client to query the collection metadata directly —
-    faster than a vector search and avoids false positives.  Returns ``False``
-    on any error so that a missing or empty collection is never treated as a
-    duplicate.
-    """
+    """Return True if a document with ``hash == text_hash`` already exists."""
     try:
         col = chroma_client.get_or_create_collection(collection_name)
         result = col.get(
@@ -64,6 +64,28 @@ def _is_duplicate(text_hash: str, collection_name: str, chroma_client: Any) -> b
         return False
 
 
+def _summarize_messages(texts: list[str], llm: Any = None) -> str:
+    """Call the LLM to produce a single episodic-memory summary of *texts*.
+
+    Parameters
+    ----------
+    texts:  List of raw STM message strings to summarise.
+    llm:    Optional pre-built LLM instance; uses the configured provider if
+            omitted.  Injected by tests to avoid live network calls.
+
+    Returns
+    -------
+    The summary string returned by the LLM.
+    """
+    from providers.llm import get_llm
+
+    _llm = llm or get_llm(temperature=0.3)
+    numbered = "\n".join(f"{i + 1}. {t}" for i, t in enumerate(texts))
+    prompt = _SUMMARY_PROMPT.format(messages=numbered)
+    response = _llm.invoke([HumanMessage(content=prompt)])
+    return str(response.content).strip()
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -72,12 +94,22 @@ def consolidate(
     *,
     session_id: str = SESSION_ID,
     ttl: int = STM_TTL,
-    window: int = DEFAULT_WINDOW,
+    window: int = CONSOLIDATION_WINDOW,
     collection: str = DEFAULT_COLLECTION,
+    summarize: bool = True,
     embedding_fn: Embeddings | None = None,
     chroma_client: Any = None,
+    llm: Any = None,
 ) -> int:
-    """Replay the last *window* STM messages into LTM, skipping duplicates.
+    """Consolidate recent STM messages into LTM.
+
+    When *summarize* is ``True`` (default) all messages in *window* are fed to
+    the LLM which produces a single episodic-memory summary.  That summary is
+    stored as one LTM document, keyed by a hash of the raw message batch so
+    the same batch is never stored twice.
+
+    When *summarize* is ``False`` each message is stored individually (legacy
+    behaviour), also with per-message dedup.
 
     Parameters
     ----------
@@ -85,16 +117,52 @@ def consolidate(
     ttl:           Redis TTL (passed through to STM helpers).
     window:        Maximum number of recent messages to consider.
     collection:    Target ChromaDB collection (default: ``"episodic"``).
-    embedding_fn:  Embeddings callable for ChromaDB (uses live model if None).
-    chroma_client: ChromaDB client (uses HTTP client from config if None).
+    summarize:     Summarise the batch via LLM before storing (default: True).
+    embedding_fn:  Embeddings callable for ChromaDB.
+    chroma_client: ChromaDB client.
+    llm:           LLM instance for summarisation (uses configured provider if
+                   None and *summarize* is True).
 
     Returns
     -------
-    Number of new documents written to LTM.
+    Number of new documents written to LTM (0 or 1 when summarizing, 0–N
+    when storing raw messages).
     """
     _client = chroma_client if chroma_client is not None else _http_client()
     messages = get_short_term_memory(window, session_id=session_id, ttl=ttl)
 
+    if not messages:
+        logger.info("Consolidator: no messages in STM — nothing to consolidate")
+        return 0
+
+    if summarize:
+        # Hash the full ordered batch to detect already-consolidated windows.
+        batch_text = "\n".join(messages)
+        h = _text_hash(batch_text)
+        if _is_duplicate(h, collection, _client):
+            logger.debug("Consolidator: batch already consolidated (hash=%s)", h[:8])
+            return 0
+
+        summary = _summarize_messages(messages, llm=llm)
+        add_to_ltm(
+            summary,
+            {
+                "source": "summarized",
+                "hash": h,
+                "message_count": len(messages),
+            },
+            collection,
+            embedding_fn=embedding_fn,
+            chroma_client=_client,
+        )
+        logger.info(
+            "Consolidator: summarized %d messages → 1 LTM document (hash=%s)",
+            len(messages),
+            h[:8],
+        )
+        return 1
+
+    # Raw (legacy) path — store each message individually.
     written = 0
     for text in messages:
         h = _text_hash(text)
@@ -122,8 +190,7 @@ def consolidate(
 def maybe_consolidate(state: BrainState, **kwargs: Any) -> None:
     """Trigger consolidation when ``state["should_consolidate"]`` is ``True``.
 
-    Passes all *kwargs* through to :func:`consolidate`, so callers can inject
-    ``embedding_fn`` and ``chroma_client`` for testing.
+    Passes all *kwargs* through to :func:`consolidate`.
     """
     if state.get("should_consolidate"):
         logger.info("Consolidator: should_consolidate flag set — running consolidation")
@@ -139,7 +206,7 @@ def start_scheduler(
 
     Parameters
     ----------
-    interval_seconds:   How often to run consolidation (default: 1 hour).
+    interval_seconds:     How often to run consolidation (default: 1 hour).
     **consolidate_kwargs: Forwarded to :func:`consolidate` on each run.
 
     Returns
@@ -160,6 +227,8 @@ def start_scheduler(
     )
     scheduler.start()
     logger.info(
-        "Consolidator scheduler started (interval=%ds)", interval_seconds
+        "Consolidator scheduler started (interval=%ds, summarize=%s)",
+        interval_seconds,
+        consolidate_kwargs.get("summarize", True),
     )
     return scheduler

@@ -21,6 +21,7 @@ services.
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 import time
 from collections import defaultdict
 from collections.abc import Callable
@@ -30,7 +31,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
-from config import RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW_SECONDS
+from config import CONSOLIDATION_INTERVAL_SECONDS, RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW_SECONDS
 from models.brain_state import default_brain_state
 
 logger = logging.getLogger(__name__)
@@ -68,10 +69,23 @@ class _RateLimiter:
 # Application
 # ---------------------------------------------------------------------------
 
+@asynccontextmanager
+async def _lifespan(app: FastAPI):  # type: ignore[type-arg]
+    """Start the memory-consolidation scheduler on startup; stop it on shutdown."""
+    from memory.consolidator import start_scheduler
+
+    scheduler = start_scheduler(interval_seconds=CONSOLIDATION_INTERVAL_SECONDS)
+    try:
+        yield
+    finally:
+        scheduler.shutdown(wait=False)
+
+
 app = FastAPI(
     title="Janus Process",
     description="Brain-inspired multi-agent system — REST + WebSocket API",
     version="0.1.0",
+    lifespan=_lifespan,
 )
 
 # Attach the rate limiter to app state (overridable in tests via app.state.rate_limiter)

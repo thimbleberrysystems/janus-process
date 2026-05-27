@@ -1,41 +1,16 @@
 """
 main.py — application entry point.
 
-Phase 1: stub LangGraph that passes BrainState through unchanged.
-Each subsequent phase replaces the stub node with a real agent node.
+Wires all brain-region agents via the Thalamus router (Phase 8 graph).
+Graph: amygdala → basal_ganglia → [hippocampus →] pfc → END
 """
 import logging
 
-from langgraph.graph import END, StateGraph
-
+from agents.thalamus import build_graph
 from logging_config import logger  # noqa: F401 — configures logging on import
 from models.brain_state import BrainState, default_brain_state
 
 _log = logging.getLogger("janus.main")
-
-
-# ── Stub node ─────────────────────────────────────────────────────────────────
-
-def _stub_node(state: BrainState) -> BrainState:
-    """Pass-through node.  Replaced agent-by-agent in later phases."""
-    _log.info("stub_node received input: %r", state["input"])
-    return state
-
-
-# ── Graph factory ─────────────────────────────────────────────────────────────
-
-def build_graph():
-    """
-    Compile and return the LangGraph StateGraph.
-
-    Phase 1: single stub node → END.
-    Later phases add real agent nodes and conditional edges.
-    """
-    graph = StateGraph(BrainState)
-    graph.add_node("stub", _stub_node)
-    graph.set_entry_point("stub")
-    graph.add_edge("stub", END)
-    return graph.compile()
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -53,7 +28,7 @@ def think(user_input: str) -> BrainState:
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    print("Janus Process — Phase 1 stub  (Ctrl-C to exit)\n")
+    print("Janus Process  (Ctrl-C to exit)\n")
     while True:
         try:
             user_input = input("You: ").strip()
@@ -65,5 +40,5 @@ if __name__ == "__main__":
             continue
 
         result = think(user_input)
-        response = result.get("final_response") or "(no response — agents not yet wired)"
+        response = result.get("final_response") or "(no response)"
         print(f"Brain: {response}\n")

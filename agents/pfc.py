@@ -108,7 +108,7 @@ def pfc_node(
     Returns:
         Updated BrainState with ``final_response`` and ``should_consolidate`` set.
     """
-    _llm = llm or get_llm(model_name="gpt-4o", temperature=0.3)
+    _llm = llm or get_llm(temperature=0.3)
 
     context_block = _build_context_block(state)
     messages = [

@@ -173,7 +173,7 @@ def basal_ganglia_node(
         Updated BrainState.  All fields except ``procedural_match`` are unchanged.
     """
     _conn = conn or get_connection()
-    _llm = llm or get_llm(model_name="gpt-4o-mini", temperature=0.0)
+    _llm = llm or get_llm(temperature=0.0)
 
     habits = _fetch_all_habits(_conn)
 

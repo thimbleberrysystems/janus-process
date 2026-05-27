@@ -75,7 +75,7 @@ def amygdala_node(
     Returns:
         Updated BrainState with ``emotional_weight`` set.
     """
-    _llm = llm or get_llm(model_name="gpt-4o-mini", temperature=0.0)
+    _llm = llm or get_llm(temperature=0.0)
 
     messages = [
         SystemMessage(content=_SYSTEM_PROMPT),

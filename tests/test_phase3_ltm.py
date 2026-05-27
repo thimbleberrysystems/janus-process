@@ -21,9 +21,7 @@ import chromadb
 import pytest
 from langchain_core.embeddings import DeterministicFakeEmbedding
 
-import memory.long_term as ltm_mod
 from memory.long_term import (
-    COLLECTIONS,
     add_batch_to_ltm,
     add_to_ltm,
     search_ltm,

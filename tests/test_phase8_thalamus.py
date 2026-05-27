@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 
-from agents.thalamus import HIPPOCAMPUS_THRESHOLD, build_graph, _route_after_basal_ganglia
+from agents.thalamus import HIPPOCAMPUS_THRESHOLD, _route_after_basal_ganglia, build_graph
 from models.brain_state import default_brain_state
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -21,11 +20,11 @@ class NodeTracker:
     or service calls.
     """
 
-    def __init__(self, updates: Dict[str, Any] | None = None) -> None:
+    def __init__(self, updates: dict[str, Any] | None = None) -> None:
         self.called = False
         self.call_count = 0
         self.last_received_state: dict | None = None
-        self._updates: Dict[str, Any] = updates or {}
+        self._updates: dict[str, Any] = updates or {}
 
     def __call__(self, state: dict) -> dict:
         self.called = True
@@ -277,7 +276,6 @@ class TestStateFlowBetweenNodes:
     def test_state_input_preserved_throughout(self):
         """The original 'input' field must survive unmodified through all nodes."""
         original_input = "preserve this text"
-        captured_final: list[dict] = []
 
         class PassthroughNode:
             def __init__(self, updates: dict) -> None:

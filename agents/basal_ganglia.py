@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import re
 import sqlite3
-from typing import Optional
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -130,7 +129,7 @@ def _classify(
     user_input: str,
     habits: list[sqlite3.Row],
     llm: BaseChatModel,
-) -> Optional[int]:
+) -> int | None:
     """
     Ask the LLM whether *user_input* matches any habit in *habits*.
 
@@ -144,7 +143,7 @@ def _classify(
         SystemMessage(content=_SYSTEM_PROMPT),
         HumanMessage(content=human_content),
     ]
-    response = llm.invoke(messages).content.strip()
+    response = str(llm.invoke(messages).content).strip()
 
     match = _INT_RE.search(response)
     return int(match.group(1)) if match else None

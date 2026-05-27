@@ -17,7 +17,7 @@ Marked ``@pytest.mark.integration`` — require live Redis + ChromaDB + Ollama.
 
 from __future__ import annotations
 
-from unittest.mock import ANY, MagicMock, call, patch
+from unittest.mock import ANY, patch
 
 import chromadb
 import pytest
@@ -25,7 +25,6 @@ from langchain_core.embeddings import DeterministicFakeEmbedding
 
 from memory.consolidator import (
     DEFAULT_COLLECTION,
-    DEFAULT_WINDOW,
     _is_duplicate,
     _text_hash,
     consolidate,
@@ -247,8 +246,8 @@ class TestMaybeConsolidate:
 class TestConsolidatorIntegration:
     def test_consolidate_live_stm_to_ltm(self):
         """Seed real Redis, run consolidation, verify ChromaDB is populated."""
-        from memory.short_term import add_to_short_term, clear_short_term
         from memory.long_term import search_ltm
+        from memory.short_term import add_to_short_term, clear_short_term
 
         session_id = "test-consolidator-integration"
         clear_short_term(session_id=session_id, ttl=60)

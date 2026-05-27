@@ -214,7 +214,7 @@ class TestHippocampusIntegration:
         state = default_brain_state(unique)
         state["emotional_weight"] = 0.5
 
-        result = hippocampus_node(
+        hippocampus_node(
             state,
             chroma_client=client,
             embedding_fn=embed,

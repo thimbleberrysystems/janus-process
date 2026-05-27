@@ -27,7 +27,7 @@ code is required.
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from langgraph.graph import END, StateGraph
 
@@ -67,10 +67,10 @@ def _route_after_basal_ganglia(state: BrainState) -> str:
 
 def build_graph(
     *,
-    amygdala: Optional[Callable] = None,
-    basal_ganglia: Optional[Callable] = None,
-    hippocampus: Optional[Callable] = None,
-    pfc: Optional[Callable] = None,
+    amygdala: Callable | None = None,
+    basal_ganglia: Callable | None = None,
+    hippocampus: Callable | None = None,
+    pfc: Callable | None = None,
 ):
     """Build and compile the Janus brain ``StateGraph``.
 

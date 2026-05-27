@@ -38,9 +38,10 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import wraps
-from typing import Any, Callable, Dict
+from typing import Any
 
 from models.brain_state import BrainState
 
@@ -69,7 +70,7 @@ class Metrics:
     total_latency_ms: float = 0.0
     """Running sum of all instrumented node durations."""
 
-    node_invocations: Dict[str, int] = field(default_factory=dict)
+    node_invocations: dict[str, int] = field(default_factory=dict)
     """Per-node invocation counters — keys are agent names."""
 
     def record_memory_hit(self) -> None:

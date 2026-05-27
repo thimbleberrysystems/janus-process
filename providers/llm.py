@@ -13,10 +13,13 @@ Usage:
 """
 from __future__ import annotations
 
-from typing import Optional
+from collections.abc import Sequence
+from typing import Any
 
 from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import BaseMessage
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from config import (
     LLM_PROVIDER,
@@ -27,7 +30,7 @@ from config import (
 )
 
 
-def get_llm(model_name: Optional[str] = None, temperature: float = 0.0) -> BaseChatModel:
+def get_llm(model_name: str | None = None, temperature: float = 0.0) -> BaseChatModel:
     """
     Return a LangChain chat model for the configured provider.
 
@@ -52,11 +55,11 @@ def get_llm(model_name: Optional[str] = None, temperature: float = 0.0) -> BaseC
     return ChatOpenAI(
         model=model_name or "gpt-4o",
         temperature=temperature,
-        api_key=OPENAI_API_KEY,
+        api_key=OPENAI_API_KEY,  # type: ignore[arg-type]
     )
 
 
-def get_embedding_model(model_name: Optional[str] = None) -> Embeddings:
+def get_embedding_model(model_name: str | None = None) -> Embeddings:
     """
     Return a LangChain embeddings model for the configured provider.
 
@@ -76,4 +79,30 @@ def get_embedding_model(model_name: Optional[str] = None) -> Embeddings:
 
     from langchain_openai import OpenAIEmbeddings  # langchain-openai package
 
-    return OpenAIEmbeddings(api_key=OPENAI_API_KEY)
+    return OpenAIEmbeddings(api_key=OPENAI_API_KEY)  # type: ignore[arg-type]
+
+
+# ---------------------------------------------------------------------------
+# Retry helper
+# ---------------------------------------------------------------------------
+
+@retry(
+    retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=0.5, min=0.5, max=10),
+    reraise=True,
+)
+def retry_invoke(llm: Any, messages: Sequence[BaseMessage]) -> Any:
+    """Invoke *llm* with retry on transient network / timeout errors.
+
+    Retries up to 3 times with exponential back-off (0.5 s base).  Raises
+    the original exception if all attempts are exhausted.
+
+    Args:
+        llm:      Any object with an ``.invoke(messages)`` method.
+        messages: Sequence of ``BaseMessage`` instances.
+
+    Returns:
+        The model's response (typically an ``AIMessage``).
+    """
+    return llm.invoke(messages)

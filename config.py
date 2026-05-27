@@ -33,3 +33,7 @@ OLLAMA_EMBEDDING_MODEL: str = os.environ.get("OLLAMA_EMBEDDING_MODEL", "text2vec
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DATABASE_URL: str = os.environ.get("DATABASE_URL", "sqlite:///./habits.db")
+
+# ── Rate limiting ──────────────────────────────────────────────────────────────
+RATE_LIMIT_MAX_CALLS: int = int(os.environ.get("RATE_LIMIT_MAX_CALLS", "10"))
+RATE_LIMIT_WINDOW_SECONDS: int = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "60"))

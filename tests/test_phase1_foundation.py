@@ -10,17 +10,14 @@ Tests verify:
   - Stub LangGraph passes state through unchanged
 """
 import importlib
-import os
 import socket
 
 import pytest
 
 from models.brain_state import (
-    BrainState,
     default_brain_state,
     validate_brain_state,
 )
-
 
 # ── 1. BrainState schema ──────────────────────────────────────────────────────
 

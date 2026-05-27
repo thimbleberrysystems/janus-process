@@ -114,6 +114,7 @@ class TestSTMIntegration:
     def test_add_and_read_message_real(self) -> None:
         """write one message; assert it is returned by get_short_term_memory()."""
         import importlib
+
         import memory.short_term as stm_mod
         importlib.reload(stm_mod)
 
@@ -127,6 +128,7 @@ class TestSTMIntegration:
     def test_window_limit_real(self) -> None:
         """write 20 messages; assert get_short_term_memory(n=5) returns only 5."""
         import importlib
+
         import memory.short_term as stm_mod
         importlib.reload(stm_mod)
 
@@ -143,6 +145,7 @@ class TestSTMIntegration:
     def test_ttl_expiry(self) -> None:
         """write message with TTL=1s; sleep 2s; assert buffer is empty."""
         import importlib
+
         import memory.short_term as stm_mod
         importlib.reload(stm_mod)
 
@@ -157,6 +160,7 @@ class TestSTMIntegration:
     def test_empty_buffer_returns_empty_list_real(self) -> None:
         """fresh session; assert get_short_term_memory() returns []."""
         import importlib
+
         import memory.short_term as stm_mod
         importlib.reload(stm_mod)
 

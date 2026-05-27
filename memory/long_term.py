@@ -22,7 +22,7 @@ Metadata schema (all fields optional at call-site; defaults applied here):
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import chromadb
@@ -46,13 +46,13 @@ _DEFAULT_METADATA: dict[str, Any] = {
 
 # ── Internal helpers ───────────────────────────────────────────────────────────
 
-def _http_client() -> chromadb.HttpClient:
+def _http_client() -> chromadb.ClientAPI:
     """Return an HttpClient pointing at the configured ChromaDB service."""
     return chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _fill_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
@@ -113,7 +113,8 @@ def add_batch_to_ltm(
     """Store a batch of texts with optional per-item metadata in *collection*."""
     if not texts:
         return
-    filled = [_fill_metadata(m) for m in (metadatas or [None] * len(texts))]
+    nones: list[dict[str, Any] | None] = [None] * len(texts)
+    filled = [_fill_metadata(m) for m in (metadatas or nones)]
     store = _get_store(collection, embedding_fn=embedding_fn, chroma_client=chroma_client)
     store.add_texts(texts, metadatas=filled)
 

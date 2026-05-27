@@ -71,7 +71,7 @@ def get_short_term_memory(
     messages = history.messages
     if n is not None:
         messages = messages[-n:]
-    return [m.content for m in messages]
+    return [str(m.content) for m in messages]
 
 
 def clear_short_term(

@@ -21,14 +21,48 @@ services.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+import time
+from collections import defaultdict
+from collections.abc import Callable
+from threading import Lock
+from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
+from config import RATE_LIMIT_MAX_CALLS, RATE_LIMIT_WINDOW_SECONDS
 from models.brain_state import default_brain_state
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Rate limiter
+# ---------------------------------------------------------------------------
+
+class _RateLimiter:
+    """Thread-safe sliding-window rate limiter keyed by client IP."""
+
+    def __init__(self, max_calls: int, window_seconds: int) -> None:
+        self.max_calls = max_calls
+        self.window_seconds = window_seconds
+        self._calls: dict[str, list[float]] = defaultdict(list)
+        self._lock = Lock()
+
+    def is_allowed(self, key: str) -> bool:
+        now = time.time()
+        with self._lock:
+            cutoff = now - self.window_seconds
+            self._calls[key] = [t for t in self._calls[key] if t > cutoff]
+            if len(self._calls[key]) >= self.max_calls:
+                return False
+            self._calls[key].append(now)
+            return True
+
+    def reset(self) -> None:
+        with self._lock:
+            self._calls.clear()
+
 
 # ---------------------------------------------------------------------------
 # Application
@@ -38,6 +72,12 @@ app = FastAPI(
     title="Janus Process",
     description="Brain-inspired multi-agent system — REST + WebSocket API",
     version="0.1.0",
+)
+
+# Attach the rate limiter to app state (overridable in tests via app.state.rate_limiter)
+app.state.rate_limiter = _RateLimiter(
+    max_calls=RATE_LIMIT_MAX_CALLS,
+    window_seconds=RATE_LIMIT_WINDOW_SECONDS,
 )
 
 
@@ -96,13 +136,18 @@ def get_stm_clearer() -> Callable:
 
 @app.post("/think", response_model=ThinkResponse)
 def think(
+    http_request: Request,
     request: ThinkRequest,
     graph=Depends(get_brain_graph),
 ) -> ThinkResponse:
     """Run the full brain graph on *input* and return the final response.
 
     The input must be a non-empty string.  An empty string returns HTTP 422.
+    Rate-limited to ``RATE_LIMIT_MAX_CALLS`` calls per ``RATE_LIMIT_WINDOW_SECONDS`` seconds.
     """
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    if not http_request.app.state.rate_limiter.is_allowed(client_ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded — try again later")
     state = default_brain_state(request.input)
     result = graph.invoke(state)
     return ThinkResponse(response=result.get("final_response") or "")

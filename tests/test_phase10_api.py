@@ -16,13 +16,12 @@ Marked ``@pytest.mark.integration`` — require live Docker services.
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from starlette.testclient import TestClient
 
 from api.server import app, get_brain_graph, get_ltm_searcher, get_stm_clearer
-
 
 # ---------------------------------------------------------------------------
 # Helpers

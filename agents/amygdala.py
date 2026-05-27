@@ -83,6 +83,6 @@ def amygdala_node(
     ]
 
     response = _llm.invoke(messages)
-    score = _parse_score(response.content)
+    score = _parse_score(str(response.content))
 
     return {**state, "emotional_weight": score}

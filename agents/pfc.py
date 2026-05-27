@@ -117,7 +117,7 @@ def pfc_node(
     ]
 
     response = _llm.invoke(messages)
-    final_response: str = response.content.strip()
+    final_response: str = str(response.content).strip()
 
     should_consolidate: bool = float(state["emotional_weight"]) >= CONSOLIDATION_THRESHOLD
 

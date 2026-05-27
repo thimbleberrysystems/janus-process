@@ -54,3 +54,4 @@ select = ["E", "F", "I", "UP"]
 python_version = "3.11"
 strict = false
 ignore_missing_imports = true
+disable_error_code = ["import-untyped"]

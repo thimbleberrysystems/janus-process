@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from typing import Any, Callable, Optional
+from typing import Any
+
+from langchain_core.embeddings import Embeddings
 
 from config import SESSION_ID, STM_TTL
 from memory.long_term import _http_client, add_to_ltm
@@ -72,7 +74,7 @@ def consolidate(
     ttl: int = STM_TTL,
     window: int = DEFAULT_WINDOW,
     collection: str = DEFAULT_COLLECTION,
-    embedding_fn: Optional[Callable] = None,
+    embedding_fn: Embeddings | None = None,
     chroma_client: Any = None,
 ) -> int:
     """Replay the last *window* STM messages into LTM, skipping duplicates.

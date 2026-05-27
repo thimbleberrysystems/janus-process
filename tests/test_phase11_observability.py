@@ -261,8 +261,8 @@ class TestEvalDataset:
     def test_eval_dataset_has_diverse_emotional_range(self, dataset):
         """Dataset must contain both low-emotion (≤0.2) and high-emotion (≥0.7) examples."""
         labels = [item["emotional_label"] for item in dataset]
-        assert any(l <= 0.2 for l in labels), "No low-emotion examples in dataset"
-        assert any(l >= 0.7 for l in labels), "No high-emotion examples in dataset"
+        assert any(v <= 0.2 for v in labels), "No low-emotion examples in dataset"
+        assert any(v >= 0.7 for v in labels), "No high-emotion examples in dataset"
 
     def test_eval_dataset_is_valid_json(self):
         """The dataset file must be parseable JSON."""
@@ -305,10 +305,11 @@ class TestObservabilityIntegration:
 
     def test_log_emitted_by_instrumented_graph(self, caplog):
         """Running an instrumented graph produces observability log records."""
+        import agents.amygdala as _amygdala_mod
         from agents.thalamus import build_graph
 
         graph = build_graph(
-            amygdala=instrument_node("amygdala", __import__("agents.amygdala", fromlist=["amygdala_node"]).amygdala_node),
+            amygdala=instrument_node("amygdala", _amygdala_mod.amygdala_node),
         )
         with caplog.at_level(logging.INFO, logger="janus.observability"):
             graph.invoke(default_brain_state("hello"))

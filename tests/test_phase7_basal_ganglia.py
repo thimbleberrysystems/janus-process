@@ -30,7 +30,7 @@ from models.brain_state import default_brain_state
 
 
 @pytest.fixture()
-def db() -> sqlite3.Connection:
+def db() -> sqlite3.Connection:  # type: ignore[misc]
     """Fresh in-memory SQLite DB with habits schema."""
     conn = sqlite3.connect(":memory:")
     conn.row_factory = sqlite3.Row

@@ -24,7 +24,7 @@ def _stub_node(state: BrainState) -> BrainState:
 
 # ── Graph factory ─────────────────────────────────────────────────────────────
 
-def build_graph() -> StateGraph:
+def build_graph():
     """
     Compile and return the LangGraph StateGraph.
 
@@ -46,7 +46,7 @@ brain = build_graph()
 def think(user_input: str) -> BrainState:
     """Run the brain graph for a single turn and return the final state."""
     state = default_brain_state(user_input)
-    result: BrainState = brain.invoke(state)
+    result: BrainState = brain.invoke(state)  # type: ignore[attr-defined]
     return result
 
 

@@ -5,7 +5,7 @@ Every agent node receives a BrainState dict and returns an updated copy.
 Use default_brain_state() to create a correctly initialised instance, and
 validate_brain_state() for runtime field checks.
 """
-from typing import Optional, TypedDict
+from typing import TypedDict
 
 # Fields that must always be present (non-optional with no default).
 _REQUIRED_FIELDS: frozenset[str] = frozenset({
@@ -31,10 +31,10 @@ class BrainState(TypedDict):
     retrieved_memories: list[str]     # top-k docs from ChromaDB LTM
 
     # ── Basal Ganglia ─────────────────────────────────────────────────────────
-    procedural_match: Optional[str]   # matched habit response, or None
+    procedural_match: str | None   # matched habit response, or None
 
     # ── Output ────────────────────────────────────────────────────────────────
-    final_response: Optional[str]     # synthesised answer from PFC
+    final_response: str | None     # synthesised answer from PFC
 
     # ── Consolidation flag ────────────────────────────────────────────────────
     should_consolidate: bool          # True → trigger STM→LTM consolidation

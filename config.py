@@ -25,5 +25,11 @@ CHROMA_PERSIST_DIR: str = os.environ.get("CHROMA_PERSIST_DIR", "./chroma_db")
 CHROMA_HOST: str = os.environ.get("CHROMA_HOST", "localhost")
 CHROMA_PORT: int = int(os.environ.get("CHROMA_PORT", "8000"))
 
+# ── Ollama / LLM provider selection ─────────────────────────────────────────────
+LLM_PROVIDER: str = os.environ.get("LLM_PROVIDER", "openai").lower()
+OLLAMA_URL: str = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434")
+OLLAMA_MODEL: str = os.environ.get("OLLAMA_MODEL", "llama2")
+OLLAMA_EMBEDDING_MODEL: str = os.environ.get("OLLAMA_EMBEDDING_MODEL", "text2vec")
+
 # ── Database ──────────────────────────────────────────────────────────────────
 DATABASE_URL: str = os.environ.get("DATABASE_URL", "sqlite:///./habits.db")

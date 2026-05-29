@@ -118,12 +118,16 @@ for i in $(seq 1 30); do
     [[ $i -eq 30 ]] && die "Redis did not become healthy within 30 s"
 done
 
-# ChromaDB
+# ChromaDB  (try v2 then v1 — API path changed in chroma 0.6)
 log "Waiting for ChromaDB..."
-for i in $(seq 1 40); do
-    curl -sf "http://localhost:${CHROMA_PORT}/api/v1/heartbeat" &>/dev/null && { ok "ChromaDB ready"; break; }
+for i in $(seq 1 60); do
+    if curl -sf "http://localhost:${CHROMA_PORT}/api/v2/heartbeat" &>/dev/null \
+    || curl -sf "http://localhost:${CHROMA_PORT}/api/v1/heartbeat" &>/dev/null; then
+        ok "ChromaDB ready"
+        break
+    fi
     sleep 1
-    [[ $i -eq 40 ]] && die "ChromaDB did not become healthy within 40 s"
+    [[ $i -eq 60 ]] && die "ChromaDB did not become healthy within 60 s"
 done
 
 # Ollama

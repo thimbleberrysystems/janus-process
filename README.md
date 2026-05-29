@@ -4,14 +4,14 @@
 
 ### *A brain-inspired multi-agent cognitive architecture for next-generation AI reasoning*
 
-[![Python 3.14](https://img.shields.io/badge/python-3.14-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://python.org)
 [![LangGraph](https://img.shields.io/badge/LangGraph-1.2-FF6B35?logo=langchain&logoColor=white)](https://langchain-ai.github.io/langgraph/)
 [![LangChain](https://img.shields.io/badge/LangChain-0.3-1C3C3C?logo=langchain&logoColor=white)](https://langchain.com)
 [![FastAPI](https://img.shields.io/badge/FastAPI-REST%20%2B%20WebSocket-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Redis](https://img.shields.io/badge/Redis-STM-DC382D?logo=redis&logoColor=white)](https://redis.io)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20LTM-F97316)](https://trychroma.com)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o-412991?logo=openai&logoColor=white)](https://openai.com)
-[![Tests](https://img.shields.io/badge/tests-150%2B%20passing-22C55E?logo=pytest&logoColor=white)](tests/)
+[![Tests](https://img.shields.io/badge/tests-258%20passing-22C55E?logo=pytest&logoColor=white)](tests/)
 [![LangSmith](https://img.shields.io/badge/LangSmith-Observability-F59E0B)](https://smith.langchain.com)
 
 </div>
@@ -161,7 +161,7 @@ PFC proposal → Gate evaluation
 
 ```bash
 # 1. Clone and create virtual environment
-git clone https://github.com/your-org/janus-process.git
+git clone https://github.com/thimbleberrysystems/janus-process.git
 cd janus-process
 python3 -m venv .venv && source .venv/bin/activate
 
@@ -173,12 +173,12 @@ pip install -e '.[dev]'
 cp .env.example .env
 # Add: OPENAI_API_KEY, LANGSMITH_API_KEY
 
-# 4. Start infrastructure
-docker compose up -d          # Redis + ChromaDB
-
-# 5. Run the interactive CLI
-python main.py
+# 4. Bootstrap the project and start services
+./launch.sh          # starts the API server
+./launch.sh --cli    # starts the interactive CLI
 ```
+
+The bootstrap script will create `.env` from `.env.example` if needed, install dependencies, start Redis and ChromaDB, detect native Ollama if present, and pull required Ollama models.
 
 ```
 Janus Process  (Ctrl-C to exit)
@@ -234,5 +234,8 @@ The test suite spans 16 implementation phases and covers every agent node, routi
 
 - The `.venv/` directory is excluded from git via `.gitignore`.
 - Integration tests require Docker (`docker compose up -d`).
+- Use `./launch.sh` to bootstrap the environment, install dependencies, start services, and pull Ollama models.
+- If native Ollama is already installed and listening on port `11434`, `launch.sh` prefers the host installation over the Docker container.
+- On systems with limited GPU VRAM, the Ollama service is configured to run CPU-only to avoid runner crashes when loading larger models.
 - LangSmith tracing is enabled automatically when `LANGCHAIN_TRACING_V2=true` and `LANGCHAIN_API_KEY` are set in `.env`.
 - `MAX_PFC_LOOPS` (default `2`) is configurable via environment variable to control the PFC ↔ BG loop budget.

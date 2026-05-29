@@ -107,8 +107,21 @@ ok "Docker daemon running  ($(docker --version | head -1))"
 
 # ── Services ──────────────────────────────────────────────────────────────────
 hdr "Services  (redis · chromadb · ollama)"
-log "docker compose up -d redis chromadb ollama"
-docker compose up -d redis chromadb ollama
+
+# Detect native Ollama — if present it binds 11434 first and shadows Docker's port mapping
+NATIVE_OLLAMA=false
+if command -v ollama &>/dev/null && ollama list &>/dev/null 2>&1; then
+    NATIVE_OLLAMA=true
+    ok "Native Ollama detected — skipping Docker ollama service"
+fi
+
+if [[ "$NATIVE_OLLAMA" == "true" ]]; then
+    log "docker compose up -d redis chromadb"
+    docker compose up -d redis chromadb
+else
+    log "docker compose up -d redis chromadb ollama"
+    docker compose up -d redis chromadb ollama
+fi
 
 # Redis
 log "Waiting for Redis..."
@@ -129,16 +142,20 @@ for i in $(seq 1 60); do
     [[ $i -eq 60 ]] && die "ChromaDB did not become healthy within 60 s"
 done
 
-# Ollama — pure bash TCP check
-log "Waiting for Ollama..."
-for i in $(seq 1 90); do
-    if (echo > /dev/tcp/localhost/11434) 2>/dev/null; then
-        ok "Ollama ready"
-        break
-    fi
-    sleep 1
-    [[ $i -eq 90 ]] && die "Ollama did not become healthy within 90 s"
-done
+# Ollama
+if [[ "$NATIVE_OLLAMA" == "true" ]]; then
+    ok "Ollama (native) already running on port 11434"
+else
+    log "Waiting for Ollama..."
+    for i in $(seq 1 90); do
+        if (echo > /dev/tcp/localhost/11434) 2>/dev/null; then
+            ok "Ollama ready"
+            break
+        fi
+        sleep 1
+        [[ $i -eq 90 ]] && die "Ollama did not become healthy within 90 s"
+    done
+fi
 
 # ── Ollama model pulls ────────────────────────────────────────────────────────
 if [[ "$LLM_PROVIDER" == "ollama" ]]; then
@@ -155,12 +172,27 @@ if [[ "$LLM_PROVIDER" == "ollama" ]]; then
         fi
     done
 
+    _ollama_list() {
+        if [[ "$NATIVE_OLLAMA" == "true" ]]; then
+            ollama list 2>/dev/null | awk 'NR>1{print $1}'
+        else
+            docker exec janus-ollama ollama list 2>/dev/null | awk 'NR>1{print $1}'
+        fi
+    }
+    _ollama_pull() {
+        if [[ "$NATIVE_OLLAMA" == "true" ]]; then
+            ollama pull "$1"
+        else
+            docker exec janus-ollama ollama pull "$1"
+        fi
+    }
+
     for model in "${MODELS_TO_PULL[@]}"; do
-        if docker exec janus-ollama ollama list 2>/dev/null | awk 'NR>1{print $1}' | grep -qxF "$model"; then
+        if _ollama_list | grep -qxF "$model"; then
             ok "$model already present"
         else
             log "Pulling ${BOLD}${model}${NC} — this may take several minutes on first run..."
-            docker exec janus-ollama ollama pull "$model"
+            _ollama_pull "$model"
             ok "$model downloaded"
         fi
     done

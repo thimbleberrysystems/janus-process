@@ -118,11 +118,17 @@ for i in $(seq 1 30); do
     [[ $i -eq 30 ]] && die "Redis did not become healthy within 30 s"
 done
 
-# ChromaDB  (try v2 then v1 — API path changed in chroma 0.6)
+# ChromaDB  (use the chromadb Python client — more reliable than curl)
 log "Waiting for ChromaDB..."
 for i in $(seq 1 60); do
-    if curl -sf "http://localhost:${CHROMA_PORT}/api/v2/heartbeat" &>/dev/null \
-    || curl -sf "http://localhost:${CHROMA_PORT}/api/v1/heartbeat" &>/dev/null; then
+    if python -c "
+import chromadb, sys
+try:
+    chromadb.HttpClient(host='localhost', port=int('${CHROMA_PORT}')).heartbeat()
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null; then
         ok "ChromaDB ready"
         break
     fi
@@ -130,10 +136,20 @@ for i in $(seq 1 60); do
     [[ $i -eq 60 ]] && die "ChromaDB did not become healthy within 60 s"
 done
 
-# Ollama
+# Ollama  (use urllib from the venv Python)
 log "Waiting for Ollama..."
 for i in $(seq 1 90); do
-    curl -sf "http://localhost:11434/api/tags" &>/dev/null && { ok "Ollama ready"; break; }
+    if python -c "
+import urllib.request, sys
+try:
+    urllib.request.urlopen('http://localhost:11434/api/tags', timeout=2)
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null; then
+        ok "Ollama ready"
+        break
+    fi
     sleep 1
     [[ $i -eq 90 ]] && die "Ollama did not become healthy within 90 s"
 done

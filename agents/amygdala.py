@@ -55,6 +55,34 @@ def _parse_score(raw: str) -> float:
     return max(0.0, min(1.0, float(match.group())))
 
 
+# ── Global state modifiers ─────────────────────────────────────────────────────
+
+def _derive_modifiers(weight: float) -> tuple[float, str]:
+    """
+    Map *weight* (0.0–1.0) to an LLM temperature and an emotional directive.
+
+    Higher emotional weight → lower temperature (more controlled, careful
+    output) and a stronger empathy/safety instruction for the PFC.
+
+    Returns:
+        (llm_temperature, emotional_directive)
+    """
+    if weight < 0.2:
+        return 0.7, ""
+    if weight < 0.5:
+        return 0.5, "Be warm and supportive in your response."
+    if weight < 0.7:
+        return 0.3, (
+            "The user appears to be under stress. "
+            "Acknowledge their feelings before responding."
+        )
+    return 0.1, (
+        "The user is in significant distress. "
+        "Prioritise emotional support and safety. "
+        "Respond with calm, measured compassion."
+    )
+
+
 # ── LangGraph node ─────────────────────────────────────────────────────────────
 
 def amygdala_node(
@@ -84,5 +112,11 @@ def amygdala_node(
 
     response = _llm.invoke(messages)
     score = _parse_score(str(response.content))
+    llm_temperature, emotional_directive = _derive_modifiers(score)
 
-    return {**state, "emotional_weight": score}
+    return {
+        **state,
+        "emotional_weight": score,
+        "llm_temperature": llm_temperature,
+        "emotional_directive": emotional_directive,
+    }

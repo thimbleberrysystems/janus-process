@@ -38,6 +38,9 @@ DATABASE_URL: str = os.environ.get("DATABASE_URL", "sqlite:///./habits.db")
 # ── Memory Consolidation ──────────────────────────────────────────────────────
 CONSOLIDATION_INTERVAL_SECONDS: int = int(os.environ.get("CONSOLIDATION_INTERVAL_SECONDS", "3600"))
 CONSOLIDATION_WINDOW: int = int(os.environ.get("CONSOLIDATION_WINDOW", "50"))
+
+# ── PFC ↔ Basal Ganglia Recurrent Loop ────────────────────────────────────────
+MAX_PFC_LOOPS: int = int(os.environ.get("MAX_PFC_LOOPS", "2"))
 # ── Rate limiting ──────────────────────────────────────────────────────────────
 RATE_LIMIT_MAX_CALLS: int = int(os.environ.get("RATE_LIMIT_MAX_CALLS", "10"))
 RATE_LIMIT_WINDOW_SECONDS: int = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "60"))

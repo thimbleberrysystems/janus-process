@@ -70,6 +70,10 @@ def _build_context_block(state: BrainState) -> str:
     if pm:
         parts.append(f"## Procedural Match\n{pm}")
 
+    feedback = state.get("bg_feedback")
+    if feedback:
+        parts.append(f"## Refinement Instruction\n{feedback}")
+
     parts.append(f"## Current Input\n{state['input']}")
     return "\n\n".join(parts)
 
@@ -87,7 +91,7 @@ def pfc_node(
     turn can use them as conversational context.  Both STM operations fail
     gracefully when Redis is unavailable.
     """
-    _llm = llm or get_llm(temperature=0.3)
+    _llm = llm or get_llm(temperature=float(state.get("llm_temperature", 0.3)))
 
     # ── 1. Load working memory from STM ───────────────────────────────────────
     working_memory: list[str] = state.get("working_memory") or []
@@ -101,8 +105,10 @@ def pfc_node(
 
     # ── 2. Build prompt and run LLM ───────────────────────────────────────────
     context_block = _build_context_block(state)
+    directive = (state.get("emotional_directive") or "").strip()
+    system_content = f"{directive}\n\n{_SYSTEM_PROMPT}" if directive else _SYSTEM_PROMPT
     messages = [
-        SystemMessage(content=_SYSTEM_PROMPT),
+        SystemMessage(content=system_content),
         HumanMessage(content=context_block),
     ]
 
@@ -119,9 +125,13 @@ def pfc_node(
     except ConnectionError as exc:
         _log.warning("Could not save to STM (Redis down?): %s", exc)
 
+    loop_count: int = int(state.get("loop_count") or 0) + 1
+
     return {
         **state,
         "working_memory": working_memory,
         "final_response": final_response,
         "should_consolidate": should_consolidate,
+        "loop_count": loop_count,
+        "bg_feedback": "",  # clear so gate evaluates this fresh proposal
     }

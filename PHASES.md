@@ -237,6 +237,90 @@
 
 ---
 
+## Phase 14 — Amygdala as Global State Modifier
+**Goal:** Elevate the Amygdala from a passive scorer to an active modulator that dynamically adjusts downstream LLM behaviour based on emotional context.
+
+### Motivation
+Biologically, the amygdala does not merely label an emotion — it hijacks downstream processing: flooding the body with cortisol, narrowing attention, and overriding deliberate thought.  The current model assigns `emotional_weight` and stops.  This phase makes that weight *do something*: it sets the LLM temperature and injects a context-specific directive into the PFC system prompt.
+
+### Deliverables
+- [ ] `BrainState` — add `llm_temperature: float` (default `0.5`) and `emotional_directive: str` (default `""`)
+- [ ] `agents/amygdala.py` — after scoring, derive both new fields via a deterministic mapping:
+  - `0.0–0.2` → temperature `0.7`, directive `""` (neutral, creative)
+  - `0.2–0.5` → temperature `0.5`, directive `"Be warm and supportive."`
+  - `0.5–0.7` → temperature `0.3`, directive `"The user appears stressed. Acknowledge feelings before responding."`
+  - `0.7–1.0` → temperature `0.1`, directive `"The user is in significant distress. Prioritise safety and calm, measured compassion."`
+- [ ] `agents/pfc.py` — use `state["llm_temperature"]` when calling `get_llm(temperature=...)` instead of the hardcoded `0.3`; prepend `state["emotional_directive"]` to `_SYSTEM_PROMPT` when non-empty
+
+### Tests — `tests/test_phase14_amygdala_modifier.py`
+- [ ] `test_neutral_input_sets_high_temperature` — emotional_weight < 0.2; assert `llm_temperature >= 0.6`
+- [ ] `test_crisis_input_sets_low_temperature` — emotional_weight > 0.7; assert `llm_temperature <= 0.2`
+- [ ] `test_emotional_directive_empty_for_neutral` — weight < 0.2; assert `emotional_directive == ""`
+- [ ] `test_emotional_directive_present_for_distress` — weight > 0.7; assert `emotional_directive` is non-empty
+- [ ] `test_pfc_uses_state_temperature` — capture `get_llm` call via mock; assert `temperature` arg matches `state["llm_temperature"]`
+- [ ] `test_pfc_injects_directive_into_prompt` — set `emotional_directive="Be compassionate."`; capture messages via mock; assert directive appears in system message content
+
+---
+
+## Phase 15 — Basal Ganglia Response Gate
+**Goal:** Replace the current bypass model (BG skips Hippocampus) with a post-PFC evaluation stage: PFC proposes, Basal Ganglia filters and either accepts or requests refinement.
+
+### Motivation
+Biologically, the basal ganglia's primary role is **action selection via inhibitory gating** — it suppresses all competing motor/cognitive programs and releases only the winning one.  In the current model it acts as a pre-filter.  This phase adds a second, post-PFC gating node that evaluates the PFC's proposed response before it reaches the user.
+
+### Deliverables
+- [ ] `BrainState` — add `pfc_proposals: list[str]` (default `[]`) and `bg_feedback: str | None` (default `None`)
+- [ ] `agents/basal_ganglia.py` — add `basal_ganglia_gate_node`:
+  - Receives `state["final_response"]` (PFC's current proposal)
+  - LLM prompt: given the user input, the proposal, and any active habits, decide `ACCEPT` or `REFINE`; if `REFINE`, return specific corrective feedback
+  - Parses structured output `{"decision": "ACCEPT"|"REFINE", "feedback": "..."}` 
+  - Writes `bg_feedback = None` (accept) or `bg_feedback = "<feedback string>"` (refine) to state
+  - Appends current `final_response` to `pfc_proposals`
+- [ ] `agents/pfc.py` — if `state["bg_feedback"]` is set, append it as a `## Refinement Instruction` section in the context block
+- [ ] Pre-PFC habit-bypass path (Phase 7) is preserved — gate node only runs on the deliberate path
+
+### Tests — `tests/test_phase15_bg_gate.py`
+- [ ] `test_gate_accepts_good_response` — mock LLM returning `ACCEPT`; assert `bg_feedback` is `None`
+- [ ] `test_gate_refines_bad_response` — mock LLM returning `REFINE` with feedback; assert `bg_feedback` is the feedback string
+- [ ] `test_proposal_appended_to_pfc_proposals` — run gate node; assert `final_response` is added to `pfc_proposals`
+- [ ] `test_pfc_incorporates_feedback` — set `bg_feedback="Be more concise."`; capture prompt; assert feedback appears in context block
+- [ ] `test_gate_node_does_not_overwrite_final_response` — assert `final_response` is unchanged after gate node runs (gate only sets `bg_feedback`)
+- [ ] `test_gate_skipped_on_habit_path` — mock `procedural_match` set; assert `basal_ganglia_gate_node` is never called
+
+---
+
+## Phase 16 — PFC ↔ Basal Ganglia Recurrent Loop
+**Goal:** Wire the Phase 15 gate into a conditional feedback loop in the Thalamus so the system can iteratively refine its response before committing.
+
+### Motivation
+Deliberate cognition is inherently iterative.  The brain does not emit a single proposal and commit; the PFC and BG cycle through competing plans until the BG releases one.  This phase makes that loop explicit in the LangGraph topology.
+
+### Deliverables
+- [ ] `BrainState` — add `loop_count: int` (default `0`)
+- [ ] `config.py` — add `MAX_PFC_LOOPS: int` (default `2`, env-configurable)
+- [ ] `agents/thalamus.py` — refactor graph topology:
+  ```
+  START → amygdala → basal_ganglia [habit check]
+      ├─[habit match]──────────────────────────────────────────► pfc ──► END
+      └─[no habit] → hippocampus? → pfc → basal_ganglia_gate
+                                              ├─[ACCEPT]────────────────► END
+                                              ├─[REFINE, count < MAX]──► pfc  (loop)
+                                              └─[REFINE, count ≥ MAX]──► END  (best-effort)
+  ```
+- [ ] `agents/thalamus.py` — `_route_after_bg_gate(state)`: reads `bg_feedback` and `loop_count`; returns `"pfc"` or `END`
+- [ ] `agents/pfc.py` — increment `loop_count` at node entry; reset `bg_feedback` before calling LLM (so gate always sees a fresh evaluation)
+- [ ] Trace logging — include `loop_count` in PFC `IN` fields and `pfc_proposals` count in PFC `OUT` fields
+
+### Tests — `tests/test_phase16_recurrent_loop.py`
+- [ ] `test_single_accept_exits_immediately` — gate returns ACCEPT on first call; assert PFC invoked exactly once
+- [ ] `test_refine_then_accept_loops_once` — gate returns REFINE then ACCEPT; assert PFC invoked twice, `loop_count=1` at second entry
+- [ ] `test_max_loops_exits_without_accept` — gate always returns REFINE; assert loop exits after `MAX_PFC_LOOPS` iterations, not infinite
+- [ ] `test_pfc_proposals_captures_all_attempts` — two-loop scenario; assert `pfc_proposals` has 2 entries
+- [ ] `test_bg_feedback_reset_between_iterations` — assert `bg_feedback` is cleared before each PFC re-invocation
+- [ ] `test_habit_path_bypasses_loop_entirely` — habit match; assert `loop_count` stays `0` and gate node never called
+
+---
+
 ## Dependency Map
 
 ```
@@ -255,6 +339,12 @@ Phase 1 (Foundation)
   Phase 8 ──► Phase 10 (API)
   Phase 10 ──► Phase 11 (Observability)
   Phase 11 ──► Phase 12 (Hardening)
+  Phase 4  ──► Phase 14 (Amygdala Modifier — reads emotional_weight)
+  Phase 6  ──► Phase 14 (PFC consumes llm_temperature + emotional_directive)
+  Phase 7  ──► Phase 15 (BG Gate — extends basal_ganglia with post-PFC evaluation)
+  Phase 6  ──► Phase 15 (PFC consumes bg_feedback)
+  Phase 15 ──► Phase 16 (Recurrent Loop — wires Phase 15 gate into Thalamus topology)
+  Phase 8  ──► Phase 16 (Thalamus graph refactored to support loop edges)
 ```
 
 ---

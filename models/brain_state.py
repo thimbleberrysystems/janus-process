@@ -23,6 +23,8 @@ class BrainState(TypedDict):
 
     # ── Amygdala ──────────────────────────────────────────────────────────────
     emotional_weight: float           # 0.0 (neutral) → 1.0 (highly emotional)
+    llm_temperature: float            # derived from emotional_weight; controls PFC LLM temperature
+    emotional_directive: str          # context-specific instruction injected into PFC system prompt
 
     # ── PFC ───────────────────────────────────────────────────────────────────
     working_memory: list[str]         # last-N messages from Redis STM
@@ -32,6 +34,9 @@ class BrainState(TypedDict):
 
     # ── Basal Ganglia ─────────────────────────────────────────────────────────
     procedural_match: str | None   # matched habit response, or None
+    pfc_proposals: list[str]          # audit trail of PFC proposals this turn
+    bg_feedback: str                  # "" = accepted; non-empty = refine instruction
+    loop_count: int                   # number of PFC iterations this turn
 
     # ── Output ────────────────────────────────────────────────────────────────
     final_response: str | None     # synthesised answer from PFC
@@ -45,9 +50,14 @@ def default_brain_state(user_input: str) -> BrainState:
     return BrainState(
         input=user_input,
         emotional_weight=0.0,
+        llm_temperature=0.5,
+        emotional_directive="",
         working_memory=[],
         retrieved_memories=[],
         procedural_match=None,
+        pfc_proposals=[],
+        bg_feedback="",
+        loop_count=0,
         final_response=None,
         should_consolidate=False,
     )

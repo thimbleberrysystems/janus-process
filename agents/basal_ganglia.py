@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from typing import Optional
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -129,7 +130,7 @@ def _classify(
     user_input: str,
     habits: list[sqlite3.Row],
     llm: BaseChatModel,
-) -> int | None:
+) -> Optional[int]:
     """
     Ask the LLM whether *user_input* matches any habit in *habits*.
 
@@ -147,6 +148,63 @@ def _classify(
 
     match = _INT_RE.search(response)
     return int(match.group(1)) if match else None
+
+
+# ── Gate prompt ──────────────────────────────────────────────────────────────
+
+_GATE_SYSTEM_PROMPT = """\
+You are a response quality evaluator for a brain-inspired AI system.
+
+You will receive the user's original input and a proposed response.
+Evaluate whether the response is appropriate, helpful, accurate, and relevant.
+
+If the response is acceptable, reply with exactly:
+  ACCEPT
+
+If the response needs improvement, reply with:
+  REFINE: <concise, specific instruction on exactly what to fix>
+
+Do not explain your reasoning beyond the instruction."""
+
+
+def basal_ganglia_gate_node(
+    state: BrainState,
+    *,
+    llm: BaseChatModel | None = None,
+) -> BrainState:
+    """
+    LangGraph node — evaluate the PFC's proposed response and gate it.
+
+    Reads  ``state["final_response"]``  — PFC's current proposal
+    Reads  ``state["input"]``           — original user input
+    Writes ``state["pfc_proposals"]``   — appends current proposal
+    Writes ``state["bg_feedback"]``     — None (accept) or feedback string (refine)
+
+    The habit-bypass path (``procedural_match`` set) should never reach this
+    node — that is enforced by the Thalamus routing.
+    """
+    _llm = llm or get_llm(model_name="gpt-4o-mini", temperature=0.0)
+
+    proposal = state.get("final_response") or ""
+    proposals = list(state.get("pfc_proposals") or [])
+    proposals.append(proposal)
+
+    human_content = (
+        f"User input: {state['input']}\n\nProposed response: {proposal}"
+    )
+    messages = [
+        SystemMessage(content=_GATE_SYSTEM_PROMPT),
+        HumanMessage(content=human_content),
+    ]
+    raw = str(_llm.invoke(messages).content).strip()
+
+    if raw.upper().startswith("REFINE"):
+        feedback = raw[len("REFINE"):].lstrip(":").strip()
+        bg_feedback: str = feedback or "Please improve the response."
+    else:
+        bg_feedback = ""  # empty string = ACCEPT (avoids LangGraph dropping None)
+
+    return {**state, "pfc_proposals": proposals, "bg_feedback": bg_feedback}
 
 
 # ── LangGraph node ─────────────────────────────────────────────────────────────
@@ -173,7 +231,7 @@ def basal_ganglia_node(
         Updated BrainState.  All fields except ``procedural_match`` are unchanged.
     """
     _conn = conn or get_connection()
-    _llm = llm or get_llm(temperature=0.0)
+    _llm = llm or get_llm(model_name="gpt-4o-mini", temperature=0.0)
 
     habits = _fetch_all_habits(_conn)
 

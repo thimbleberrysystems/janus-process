@@ -23,10 +23,15 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 
 from config import (
     LLM_PROVIDER,
+    LLM_RETRY_ATTEMPTS,
+    LLM_RETRY_BACKOFF_MULTIPLIER,
+    LLM_RETRY_MAX_WAIT,
     OLLAMA_EMBEDDING_MODEL,
     OLLAMA_MODEL,
     OLLAMA_URL,
     OPENAI_API_KEY,
+    OPENAI_EMBEDDING_MODEL,
+    OPENAI_MODEL,
 )
 
 
@@ -53,7 +58,7 @@ def get_llm(model_name: str | None = None, temperature: float = 0.0) -> BaseChat
     from langchain_openai import ChatOpenAI  # langchain-openai package
 
     return ChatOpenAI(
-        model=model_name or "gpt-4o",
+        model=model_name or OPENAI_MODEL,
         temperature=temperature,
         api_key=OPENAI_API_KEY,  # type: ignore[arg-type]
     )
@@ -79,7 +84,7 @@ def get_embedding_model(model_name: str | None = None) -> Embeddings:
 
     from langchain_openai import OpenAIEmbeddings  # langchain-openai package
 
-    return OpenAIEmbeddings(api_key=OPENAI_API_KEY)  # type: ignore[arg-type]
+    return OpenAIEmbeddings(model=OPENAI_EMBEDDING_MODEL, api_key=OPENAI_API_KEY)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -88,8 +93,8 @@ def get_embedding_model(model_name: str | None = None) -> Embeddings:
 
 @retry(
     retry=retry_if_exception_type((ConnectionError, TimeoutError, OSError)),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=0.5, min=0.5, max=10),
+    stop=stop_after_attempt(LLM_RETRY_ATTEMPTS),
+    wait=wait_exponential(multiplier=LLM_RETRY_BACKOFF_MULTIPLIER, min=LLM_RETRY_BACKOFF_MULTIPLIER, max=LLM_RETRY_MAX_WAIT),
     reraise=True,
 )
 def retry_invoke(llm: Any, messages: Sequence[BaseMessage]) -> Any:

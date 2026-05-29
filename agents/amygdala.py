@@ -20,6 +20,16 @@ import re
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from config import (
+    AMYGDALA_MODEL,
+    AMYGDALA_TEMP_CRISIS,
+    AMYGDALA_TEMP_MILD,
+    AMYGDALA_TEMP_NEUTRAL,
+    AMYGDALA_TEMP_STRESSED,
+    AMYGDALA_THRESHOLD_HIGH,
+    AMYGDALA_THRESHOLD_LOW,
+    AMYGDALA_THRESHOLD_MID,
+)
 from models.brain_state import BrainState
 from providers.llm import get_llm
 
@@ -67,16 +77,16 @@ def _derive_modifiers(weight: float) -> tuple[float, str]:
     Returns:
         (llm_temperature, emotional_directive)
     """
-    if weight < 0.2:
-        return 0.7, ""
-    if weight < 0.5:
-        return 0.5, "Be warm and supportive in your response."
-    if weight < 0.7:
-        return 0.3, (
+    if weight < AMYGDALA_THRESHOLD_LOW:
+        return AMYGDALA_TEMP_NEUTRAL, ""
+    if weight < AMYGDALA_THRESHOLD_MID:
+        return AMYGDALA_TEMP_MILD, "Be warm and supportive in your response."
+    if weight < AMYGDALA_THRESHOLD_HIGH:
+        return AMYGDALA_TEMP_STRESSED, (
             "The user appears to be under stress. "
             "Acknowledge their feelings before responding."
         )
-    return 0.1, (
+    return AMYGDALA_TEMP_CRISIS, (
         "The user is in significant distress. "
         "Prioritise emotional support and safety. "
         "Respond with calm, measured compassion."
@@ -103,7 +113,7 @@ def amygdala_node(
     Returns:
         Updated BrainState with ``emotional_weight`` set.
     """
-    _llm = llm or get_llm(temperature=0.0)
+    _llm = llm or get_llm(model_name=AMYGDALA_MODEL, temperature=0.0)
 
     messages = [
         SystemMessage(content=_SYSTEM_PROMPT),

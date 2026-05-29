@@ -12,12 +12,9 @@ Tests cover:
 """
 from __future__ import annotations
 
-import pytest
-
 from agents.thalamus import _route_after_bg_gate, build_graph
 from config import MAX_PFC_LOOPS
 from models.brain_state import BrainState, default_brain_state
-
 
 # ---------------------------------------------------------------------------
 # Helpers

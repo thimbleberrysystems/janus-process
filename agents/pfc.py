@@ -18,14 +18,15 @@ import logging
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from config import PFC_CONSOLIDATION_THRESHOLD, PFC_DEFAULT_TEMPERATURE, PFC_MODEL, PFC_STM_WINDOW
 from memory.short_term import add_to_short_term, get_short_term_memory
 from models.brain_state import BrainState
 from providers.llm import get_llm
 
 _log = logging.getLogger("janus.pfc")
 
-CONSOLIDATION_THRESHOLD: float = 0.5
-STM_WINDOW: int = 10  # last N messages to load as working memory
+CONSOLIDATION_THRESHOLD: float = PFC_CONSOLIDATION_THRESHOLD
+STM_WINDOW: int = PFC_STM_WINDOW
 
 _SYSTEM_PROMPT = (
     "You are the Prefrontal Cortex (PFC) — the core reasoning and synthesis "
@@ -91,7 +92,7 @@ def pfc_node(
     turn can use them as conversational context.  Both STM operations fail
     gracefully when Redis is unavailable.
     """
-    _llm = llm or get_llm(temperature=float(state.get("llm_temperature", 0.3)))
+    _llm = llm or get_llm(model_name=PFC_MODEL, temperature=float(state.get("llm_temperature", PFC_DEFAULT_TEMPERATURE)))
 
     # ── 1. Load working memory from STM ───────────────────────────────────────
     working_memory: list[str] = state.get("working_memory") or []

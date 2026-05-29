@@ -31,12 +31,11 @@ from __future__ import annotations
 
 import re
 import sqlite3
-from typing import Optional
 
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from config import DATABASE_URL
+from config import BG_MODEL, DATABASE_URL
 from models.brain_state import BrainState
 from providers.llm import get_llm
 
@@ -130,7 +129,7 @@ def _classify(
     user_input: str,
     habits: list[sqlite3.Row],
     llm: BaseChatModel,
-) -> Optional[int]:
+) -> int | None:
     """
     Ask the LLM whether *user_input* matches any habit in *habits*.
 
@@ -183,7 +182,7 @@ def basal_ganglia_gate_node(
     The habit-bypass path (``procedural_match`` set) should never reach this
     node — that is enforced by the Thalamus routing.
     """
-    _llm = llm or get_llm(model_name="gpt-4o-mini", temperature=0.0)
+    _llm = llm or get_llm(model_name=BG_MODEL, temperature=0.0)
 
     proposal = state.get("final_response") or ""
     proposals = list(state.get("pfc_proposals") or [])
@@ -231,7 +230,7 @@ def basal_ganglia_node(
         Updated BrainState.  All fields except ``procedural_match`` are unchanged.
     """
     _conn = conn or get_connection()
-    _llm = llm or get_llm(model_name="gpt-4o-mini", temperature=0.0)
+    _llm = llm or get_llm(model_name=BG_MODEL, temperature=0.0)
 
     habits = _fetch_all_habits(_conn)
 

@@ -24,14 +24,21 @@ from typing import Any
 from langchain_core.embeddings import Embeddings
 from langchain_core.messages import HumanMessage
 
-from config import CONSOLIDATION_WINDOW, SESSION_ID, STM_TTL
+from config import (
+    CONSOLIDATION_COLLECTION,
+    CONSOLIDATION_LLM_TEMPERATURE,
+    CONSOLIDATION_MODEL,
+    CONSOLIDATION_WINDOW,
+    SESSION_ID,
+    STM_TTL,
+)
 from memory.long_term import _http_client, add_to_ltm
 from memory.short_term import get_short_term_memory
 from models.brain_state import BrainState
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_COLLECTION: str = "episodic"
+DEFAULT_COLLECTION: str = CONSOLIDATION_COLLECTION
 
 _SUMMARY_PROMPT = (
     "You are a memory consolidation system. Summarize the following conversation "
@@ -79,7 +86,7 @@ def _summarize_messages(texts: list[str], llm: Any = None) -> str:
     """
     from providers.llm import get_llm
 
-    _llm = llm or get_llm(temperature=0.3)
+    _llm = llm or get_llm(model_name=CONSOLIDATION_MODEL, temperature=CONSOLIDATION_LLM_TEMPERATURE)
     numbered = "\n".join(f"{i + 1}. {t}" for i, t in enumerate(texts))
     prompt = _SUMMARY_PROMPT.format(messages=numbered)
     response = _llm.invoke([HumanMessage(content=prompt)])

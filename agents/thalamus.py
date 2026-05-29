@@ -37,13 +37,10 @@ from agents.amygdala import amygdala_node
 from agents.basal_ganglia import basal_ganglia_gate_node, basal_ganglia_node
 from agents.hippocampus import hippocampus_node
 from agents.pfc import pfc_node
-from config import MAX_PFC_LOOPS
+from config import HIPPOCAMPUS_THRESHOLD, MAX_PFC_LOOPS
 from models.brain_state import BrainState
 
 _log = logging.getLogger("janus.trace")
-
-# Emotional-weight threshold above which the Hippocampus (RAG) path is taken.
-HIPPOCAMPUS_THRESHOLD: float = 0.5
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +60,8 @@ _OUTPUT_FIELDS: dict[str, list[str]] = {
     "amygdala":      ["emotional_weight", "llm_temperature", "emotional_directive"],
     "basal_ganglia": ["procedural_match"],
     "hippocampus":   ["retrieved_memories"],
-    "pfc":           ["working_memory", "retrieved_memories", "final_response", "should_consolidate", "loop_count", "pfc_proposals"],
+    "pfc":           ["working_memory", "retrieved_memories", "final_response",
+                      "should_consolidate", "loop_count", "pfc_proposals"],
     "bg_gate":       ["bg_feedback", "pfc_proposals"],
 }
 
@@ -100,7 +98,7 @@ def _traced(name: str, fn: Callable) -> Callable:
         _log.info("  %-24s %.0f ms", "latency", ms)
         return result
 
-    wrapper.__name__ = fn.__name__
+    wrapper.__name__ = getattr(fn, '__name__', type(fn).__name__)
     return wrapper
 
 

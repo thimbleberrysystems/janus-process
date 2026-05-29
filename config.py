@@ -10,6 +10,8 @@ load_dotenv(override=False)  # .env values do NOT override vars already in envir
 
 # ── LLM ───────────────────────────────────────────────────────────────────────
 OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_MODEL: str = os.environ.get("OPENAI_MODEL", "gpt-4o")
+OPENAI_EMBEDDING_MODEL: str = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
 # ── LangSmith ─────────────────────────────────────────────────────────────────
 LANGSMITH_API_KEY: str = os.environ.get("LANGSMITH_API_KEY", "")
@@ -44,3 +46,38 @@ MAX_PFC_LOOPS: int = int(os.environ.get("MAX_PFC_LOOPS", "2"))
 # ── Rate limiting ──────────────────────────────────────────────────────────────
 RATE_LIMIT_MAX_CALLS: int = int(os.environ.get("RATE_LIMIT_MAX_CALLS", "10"))
 RATE_LIMIT_WINDOW_SECONDS: int = int(os.environ.get("RATE_LIMIT_WINDOW_SECONDS", "60"))
+
+# ── LLM Retry ─────────────────────────────────────────────────────────────────
+LLM_RETRY_ATTEMPTS: int = int(os.environ.get("LLM_RETRY_ATTEMPTS", "3"))
+LLM_RETRY_BACKOFF_MULTIPLIER: float = float(os.environ.get("LLM_RETRY_BACKOFF_MULTIPLIER", "0.5"))
+LLM_RETRY_MAX_WAIT: float = float(os.environ.get("LLM_RETRY_MAX_WAIT", "10"))
+
+# ── Amygdala ──────────────────────────────────────────────────────────────────
+AMYGDALA_MODEL: str = os.environ.get("AMYGDALA_MODEL", "gpt-4o-mini")
+AMYGDALA_THRESHOLD_LOW: float = float(os.environ.get("AMYGDALA_THRESHOLD_LOW", "0.2"))
+AMYGDALA_THRESHOLD_MID: float = float(os.environ.get("AMYGDALA_THRESHOLD_MID", "0.5"))
+AMYGDALA_THRESHOLD_HIGH: float = float(os.environ.get("AMYGDALA_THRESHOLD_HIGH", "0.7"))
+AMYGDALA_TEMP_NEUTRAL: float = float(os.environ.get("AMYGDALA_TEMP_NEUTRAL", "0.7"))
+AMYGDALA_TEMP_MILD: float = float(os.environ.get("AMYGDALA_TEMP_MILD", "0.5"))
+AMYGDALA_TEMP_STRESSED: float = float(os.environ.get("AMYGDALA_TEMP_STRESSED", "0.3"))
+AMYGDALA_TEMP_CRISIS: float = float(os.environ.get("AMYGDALA_TEMP_CRISIS", "0.1"))
+
+# ── PFC ────────────────────────────────────────────────────────────────────────
+PFC_MODEL: str = os.environ.get("PFC_MODEL", "gpt-4o")
+PFC_CONSOLIDATION_THRESHOLD: float = float(os.environ.get("PFC_CONSOLIDATION_THRESHOLD", "0.5"))
+PFC_STM_WINDOW: int = int(os.environ.get("PFC_STM_WINDOW", "10"))
+PFC_DEFAULT_TEMPERATURE: float = float(os.environ.get("PFC_DEFAULT_TEMPERATURE", "0.3"))
+
+# ── Basal Ganglia ─────────────────────────────────────────────────────────────
+BG_MODEL: str = os.environ.get("BG_MODEL", "gpt-4o-mini")
+
+# ── Hippocampus ────────────────────────────────────────────────────────────────
+HIPPOCAMPUS_THRESHOLD: float = float(os.environ.get("HIPPOCAMPUS_THRESHOLD", "0.5"))
+HIPPOCAMPUS_K: int = int(os.environ.get("HIPPOCAMPUS_K", "5"))
+HIPPOCAMPUS_SEARCH_TYPE: str = os.environ.get("HIPPOCAMPUS_SEARCH_TYPE", "mmr")
+HIPPOCAMPUS_COLLECTION: str = os.environ.get("HIPPOCAMPUS_COLLECTION", "episodic")
+
+# ── Consolidator (extended) ───────────────────────────────────────────────────
+CONSOLIDATION_COLLECTION: str = os.environ.get("CONSOLIDATION_COLLECTION", "episodic")
+CONSOLIDATION_LLM_TEMPERATURE: float = float(os.environ.get("CONSOLIDATION_LLM_TEMPERATURE", "0.3"))
+CONSOLIDATION_MODEL: str = os.environ.get("CONSOLIDATION_MODEL", "gpt-4o")

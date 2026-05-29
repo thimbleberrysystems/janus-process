@@ -14,15 +14,12 @@ All tests are pure unit tests — no external services required.
 """
 from __future__ import annotations
 
-from unittest.mock import MagicMock, call, patch
-
-import pytest
+from unittest.mock import MagicMock
 
 from agents.basal_ganglia import basal_ganglia_gate_node
 from agents.pfc import _build_context_block
 from agents.thalamus import build_graph
 from models.brain_state import default_brain_state
-
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 

@@ -17,7 +17,6 @@ from agents.amygdala import _derive_modifiers, amygdala_node
 from agents.pfc import pfc_node
 from models.brain_state import default_brain_state
 
-
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _mock_llm(content: str) -> MagicMock:
@@ -138,7 +137,7 @@ class TestPfcConsumesModifiers:
 
         captured_temps: list[float] = []
 
-        def fake_get_llm(temperature: float = 0.5) -> MagicMock:
+        def fake_get_llm(model_name: str | None = None, temperature: float = 0.5) -> MagicMock:
             captured_temps.append(temperature)
             return _mock_llm("response")
 

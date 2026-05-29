@@ -53,6 +53,7 @@ def _make_mock_graph(
         basal_ganglia=_NodeTracker({"procedural_match": procedural_match}),
         hippocampus=_NodeTracker({}),
         pfc=_NodeTracker({"final_response": final_response, "should_consolidate": False}),
+        bg_gate=_NodeTracker({"bg_feedback": ""}),
     )
 
 

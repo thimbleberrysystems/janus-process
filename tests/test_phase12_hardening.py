@@ -55,6 +55,7 @@ def _make_mock_graph(final_response: str = "ok"):
         basal_ganglia=_NodeTracker({"procedural_match": None}),
         hippocampus=_NodeTracker({}),
         pfc=_NodeTracker({"final_response": final_response, "should_consolidate": False}),
+        bg_gate=_NodeTracker({"bg_feedback": ""}),
     )
 
 
@@ -343,10 +344,11 @@ class TestCITypeCheck:
     def test_ci_type_check_passes(self):
         """Running ``mypy .`` against the workspace must exit with code 0."""
         result = subprocess.run(
-            [sys.executable, "-m", "mypy", ".", "--ignore-missing-imports"],
+            [sys.executable, "-m", "mypy", "."],
             cwd=str(WORKSPACE_ROOT),
             capture_output=True,
             text=True,
+            timeout=300,
         )
         assert result.returncode == 0, (
             f"mypy found type errors:\n{result.stdout}\n{result.stderr}"

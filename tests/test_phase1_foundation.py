@@ -26,8 +26,9 @@ class TestBrainStateSchema:
         """default_brain_state returns a dict with every BrainState field."""
         state = default_brain_state("hello")
         expected_keys = {
-            "input", "emotional_weight", "working_memory",
-            "retrieved_memories", "procedural_match",
+            "input", "emotional_weight", "llm_temperature", "emotional_directive",
+            "working_memory", "retrieved_memories", "procedural_match",
+            "pfc_proposals", "bg_feedback", "loop_count",
             "final_response", "should_consolidate",
         }
         assert expected_keys == set(state.keys())
@@ -186,25 +187,43 @@ class TestDockerServicesReachable:
 
 # ── 5. Stub LangGraph passes state through unchanged ─────────────────────────
 
+class _PassthroughGraph:
+    """Minimal fake compiled graph: returns state dict unchanged."""
+    def invoke(self, state: dict) -> dict:
+        return dict(state)
+
+
 class TestStubGraph:
     def test_returns_brain_state(self) -> None:
         """think() returns a dict with all BrainState keys."""
+        from unittest.mock import patch
+
+        import main
         from main import think
-        result = think("hello world")
+        with patch.object(main, "brain", _PassthroughGraph()):
+            result = think("hello world")
         assert isinstance(result, dict)
         assert "input" in result
         assert "final_response" in result
 
     def test_input_preserved(self) -> None:
         """The input field in the returned state matches what was passed in."""
+        from unittest.mock import patch
+
+        import main
         from main import think
-        result = think("stub test input")
+        with patch.object(main, "brain", _PassthroughGraph()):
+            result = think("stub test input")
         assert result["input"] == "stub test input"
 
     def test_defaults_unchanged_by_stub(self) -> None:
-        """The stub node must not modify any default field values."""
+        """think() with a passthrough graph preserves all default field values."""
+        from unittest.mock import patch
+
+        import main
         from main import think
-        result = think("anything")
+        with patch.object(main, "brain", _PassthroughGraph()):
+            result = think("anything")
         assert result["emotional_weight"] == 0.0
         assert result["working_memory"] == []
         assert result["retrieved_memories"] == []
@@ -219,9 +238,11 @@ class TestStubGraph:
         assert graph is not None
 
     def test_multiple_turns_are_independent(self) -> None:
-        """Each call to think() produces an independent state (no shared mutation)."""
-        from main import think
-        r1 = think("first")
-        r2 = think("second")
-        assert r1["input"] == "first"
-        assert r2["input"] == "second"
+        """Each call to default_brain_state() produces an independent dict — no shared state."""
+        s1 = default_brain_state("first")
+        s2 = default_brain_state("second")
+        assert s1["input"] == "first"
+        assert s2["input"] == "second"
+        # Mutating one must not affect the other (lists must be distinct objects)
+        s1["working_memory"].append("item")
+        assert s2["working_memory"] == []

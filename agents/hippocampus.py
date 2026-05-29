@@ -21,14 +21,15 @@ from typing import Any
 import chromadb
 from langchain_core.embeddings import Embeddings
 
+from config import HIPPOCAMPUS_COLLECTION, HIPPOCAMPUS_K, HIPPOCAMPUS_SEARCH_TYPE
 from memory.long_term import add_to_ltm, search_ltm_with_metadata
 from models.brain_state import BrainState
 
 # ── Defaults ───────────────────────────────────────────────────────────────────
 
-DEFAULT_K: int = 5
-DEFAULT_SEARCH_TYPE: str = "mmr"
-DEFAULT_COLLECTION: str = "episodic"
+DEFAULT_K: int = HIPPOCAMPUS_K
+DEFAULT_SEARCH_TYPE: str = HIPPOCAMPUS_SEARCH_TYPE
+DEFAULT_COLLECTION: str = HIPPOCAMPUS_COLLECTION
 
 
 # ── LangGraph node ─────────────────────────────────────────────────────────────

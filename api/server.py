@@ -21,10 +21,10 @@ services.
 from __future__ import annotations
 
 import logging
-from contextlib import asynccontextmanager
 import time
 from collections import defaultdict
 from collections.abc import Callable
+from contextlib import asynccontextmanager
 from threading import Lock
 from typing import Any
 

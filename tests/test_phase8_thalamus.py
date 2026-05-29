@@ -39,16 +39,16 @@ def _make_nodes(
     procedural_match: str | None = None,
     final_response: str = "mock response",
 ):
-    """Return a (amygdala, basal_ganglia, hippocampus, pfc) tuple of NodeTrackers.
+    """Return a (amygdala, basal_ganglia, hippocampus, pfc, bg_gate) tuple of NodeTrackers.
 
-    The amygdala tracker sets emotional_weight; basal_ganglia sets
-    procedural_match; pfc sets final_response.
+    bg_gate always accepts (bg_feedback="") so the loop exits immediately.
     """
     amygdala = NodeTracker(updates={"emotional_weight": emotional_weight})
     basal_ganglia = NodeTracker(updates={"procedural_match": procedural_match})
     hippocampus = NodeTracker()
     pfc = NodeTracker(updates={"final_response": final_response, "should_consolidate": False})
-    return amygdala, basal_ganglia, hippocampus, pfc
+    bg_gate = NodeTracker(updates={"bg_feedback": ""})
+    return amygdala, basal_ganglia, hippocampus, pfc, bg_gate
 
 
 # ---------------------------------------------------------------------------
@@ -97,12 +97,13 @@ class TestGraphCompiles:
         assert hasattr(compiled, "invoke"), "Compiled graph must have an invoke() method"
 
     def test_graph_compiles_with_mock_nodes(self):
-        amygdala, basal_ganglia, hippocampus, pfc = _make_nodes()
+        amygdala, basal_ganglia, hippocampus, pfc, bg_gate = _make_nodes()
         compiled = build_graph(
             amygdala=amygdala,
             basal_ganglia=basal_ganglia,
             hippocampus=hippocampus,
             pfc=pfc,
+            bg_gate=bg_gate,
         )
         assert hasattr(compiled, "invoke")
 
@@ -110,7 +111,7 @@ class TestGraphCompiles:
 class TestRoutingIntegration:
     def test_low_emotion_routes_to_pfc_direct(self):
         """score=0.2, no habit match → Hippocampus must NOT be invoked."""
-        amygdala, basal_ganglia, hippocampus, pfc = _make_nodes(
+        amygdala, basal_ganglia, hippocampus, pfc, bg_gate = _make_nodes(
             emotional_weight=0.2, procedural_match=None
         )
         compiled = build_graph(
@@ -118,6 +119,7 @@ class TestRoutingIntegration:
             basal_ganglia=basal_ganglia,
             hippocampus=hippocampus,
             pfc=pfc,
+            bg_gate=bg_gate,
         )
         initial = default_brain_state("what time is it?")
         compiled.invoke(initial)
@@ -129,7 +131,7 @@ class TestRoutingIntegration:
 
     def test_high_emotion_routes_via_hippocampus(self):
         """score=0.9, no habit match → Hippocampus IS invoked before PFC."""
-        amygdala, basal_ganglia, hippocampus, pfc = _make_nodes(
+        amygdala, basal_ganglia, hippocampus, pfc, bg_gate = _make_nodes(
             emotional_weight=0.9, procedural_match=None
         )
         compiled = build_graph(
@@ -137,6 +139,7 @@ class TestRoutingIntegration:
             basal_ganglia=basal_ganglia,
             hippocampus=hippocampus,
             pfc=pfc,
+            bg_gate=bg_gate,
         )
         initial = default_brain_state("I just lost my job")
         compiled.invoke(initial)
@@ -146,7 +149,7 @@ class TestRoutingIntegration:
 
     def test_habit_match_routes_via_basal_ganglia(self):
         """Procedural match found → Basal Ganglia IS invoked; Hippocampus skipped."""
-        amygdala, basal_ganglia, hippocampus, pfc = _make_nodes(
+        amygdala, basal_ganglia, hippocampus, pfc, bg_gate = _make_nodes(
             emotional_weight=0.3, procedural_match="Hello! How can I help you?"
         )
         compiled = build_graph(
@@ -154,6 +157,7 @@ class TestRoutingIntegration:
             basal_ganglia=basal_ganglia,
             hippocampus=hippocampus,
             pfc=pfc,
+            bg_gate=bg_gate,
         )
         initial = default_brain_state("hello there")
         compiled.invoke(initial)
@@ -164,7 +168,7 @@ class TestRoutingIntegration:
 
     def test_habit_match_with_high_emotion_still_skips_hippocampus(self):
         """Habit match takes priority over high emotion — no RAG retrieval needed."""
-        amygdala, basal_ganglia, hippocampus, pfc = _make_nodes(
+        amygdala, basal_ganglia, hippocampus, pfc, bg_gate = _make_nodes(
             emotional_weight=0.95, procedural_match="Bye!"
         )
         compiled = build_graph(
@@ -172,6 +176,7 @@ class TestRoutingIntegration:
             basal_ganglia=basal_ganglia,
             hippocampus=hippocampus,
             pfc=pfc,
+            bg_gate=bg_gate,
         )
         compiled.invoke(default_brain_state("goodbye"))
         assert not hippocampus.called
@@ -180,7 +185,7 @@ class TestRoutingIntegration:
 class TestFullGraphEndToEnd:
     def test_full_graph_sets_final_response(self):
         """All nodes mocked; graph must return a state with final_response set."""
-        amygdala, basal_ganglia, hippocampus, pfc = _make_nodes(
+        amygdala, basal_ganglia, hippocampus, pfc, bg_gate = _make_nodes(
             emotional_weight=0.8,
             procedural_match=None,
             final_response="Here is your answer.",
@@ -190,14 +195,15 @@ class TestFullGraphEndToEnd:
             basal_ganglia=basal_ganglia,
             hippocampus=hippocampus,
             pfc=pfc,
+            bg_gate=bg_gate,
         )
         result = compiled.invoke(default_brain_state("tell me something"))
 
         assert result["final_response"] == "Here is your answer."
 
     def test_full_graph_all_nodes_run_on_high_emotion(self):
-        """High emotion: all four nodes must be invoked."""
-        amygdala, basal_ganglia, hippocampus, pfc = _make_nodes(
+        """High emotion: all five nodes (incl. bg_gate) must be invoked once."""
+        amygdala, basal_ganglia, hippocampus, pfc, bg_gate = _make_nodes(
             emotional_weight=0.85,
             procedural_match=None,
         )
@@ -206,6 +212,7 @@ class TestFullGraphEndToEnd:
             basal_ganglia=basal_ganglia,
             hippocampus=hippocampus,
             pfc=pfc,
+            bg_gate=bg_gate,
         )
         compiled.invoke(default_brain_state("I am in crisis"))
 
@@ -213,10 +220,11 @@ class TestFullGraphEndToEnd:
         assert basal_ganglia.call_count == 1
         assert hippocampus.call_count == 1
         assert pfc.call_count == 1
+        assert bg_gate.call_count == 1
 
     def test_full_graph_low_emotion_no_habit_three_nodes(self):
-        """Low emotion + no habit: amygdala, basal_ganglia, pfc — NOT hippocampus."""
-        amygdala, basal_ganglia, hippocampus, pfc = _make_nodes(
+        """Low emotion + no habit: amygdala, basal_ganglia, pfc, bg_gate — NOT hippocampus."""
+        amygdala, basal_ganglia, hippocampus, pfc, bg_gate = _make_nodes(
             emotional_weight=0.1,
             procedural_match=None,
         )
@@ -225,6 +233,7 @@ class TestFullGraphEndToEnd:
             basal_ganglia=basal_ganglia,
             hippocampus=hippocampus,
             pfc=pfc,
+            bg_gate=bg_gate,
         )
         compiled.invoke(default_brain_state("what is 2 + 2?"))
 
@@ -232,6 +241,7 @@ class TestFullGraphEndToEnd:
         assert basal_ganglia.call_count == 1
         assert hippocampus.call_count == 0
         assert pfc.call_count == 1
+        assert bg_gate.call_count == 1
 
 
 class TestStateFlowBetweenNodes:
@@ -252,16 +262,19 @@ class TestStateFlowBetweenNodes:
         hippocampus_node = RecordingNode({"retrieved_memories": ["memory A"]})
         pfc_node = RecordingNode({"final_response": "done", "should_consolidate": True})
 
+        bg_gate_node = RecordingNode({"bg_feedback": ""})
+
         compiled = build_graph(
             amygdala=amygdala_node,
             basal_ganglia=basal_ganglia_node,
             hippocampus=hippocampus_node,
             pfc=pfc_node,
+            bg_gate=bg_gate_node,
         )
         compiled.invoke(default_brain_state("test input"))
 
-        # Four nodes ran (amygdala, basal_ganglia, hippocampus, pfc)
-        assert len(received) == 4, f"Expected 4 node invocations, got {len(received)}"
+        # Five nodes ran (amygdala, basal_ganglia, hippocampus, pfc, bg_gate)
+        assert len(received) == 5, f"Expected 5 node invocations, got {len(received)}"
 
         # Basal Ganglia must see the emotional_weight set by Amygdala.
         assert received[1]["emotional_weight"] == 0.9
@@ -291,6 +304,7 @@ class TestStateFlowBetweenNodes:
             basal_ganglia=PassthroughNode({"procedural_match": None}),
             hippocampus=PassthroughNode({}),
             pfc=pfc_node,
+            bg_gate=PassthroughNode({"bg_feedback": ""}),
         )
         result = compiled.invoke(default_brain_state(original_input))
         assert result["input"] == original_input

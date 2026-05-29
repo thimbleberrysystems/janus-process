@@ -34,7 +34,7 @@ cd "$ROOT"
 
 MODE="${1:-}"
 if [[ "$MODE" == "--help" || "$MODE" == "-h" ]]; then
-    sed -n '/^# Usage/,/^$/p' "$0" | grep -v '^#'
+    sed -n '/^# Usage/,/^#$/{ /^# */s/^# \?//p }' "$0"
     exit 0
 fi
 
@@ -51,7 +51,7 @@ fi
 _load_env() {
     set -o allexport
     # shellcheck source=.env
-    source <(grep -v '^\s*[#;]' .env | grep -v '^\s*$' | sed 's/[[:space:]]*#.*//')
+    source <(grep -v '^\s*[#;]' .env | grep -v '^\s*$' | sed 's/[[:space:]]*#.*//' | tr -d '\r')
     set +o allexport
 }
 _load_env
@@ -118,17 +118,10 @@ for i in $(seq 1 30); do
     [[ $i -eq 30 ]] && die "Redis did not become healthy within 30 s"
 done
 
-# ChromaDB  (use the chromadb Python client — more reliable than curl)
+# ChromaDB — pure bash TCP check; no curl/python needed
 log "Waiting for ChromaDB..."
 for i in $(seq 1 60); do
-    if python -c "
-import chromadb, sys
-try:
-    chromadb.HttpClient(host='localhost', port=int('${CHROMA_PORT}')).heartbeat()
-    sys.exit(0)
-except Exception:
-    sys.exit(1)
-" 2>/dev/null; then
+    if (echo > /dev/tcp/localhost/"${CHROMA_PORT}") 2>/dev/null; then
         ok "ChromaDB ready"
         break
     fi
@@ -136,17 +129,10 @@ except Exception:
     [[ $i -eq 60 ]] && die "ChromaDB did not become healthy within 60 s"
 done
 
-# Ollama  (use urllib from the venv Python)
+# Ollama — pure bash TCP check
 log "Waiting for Ollama..."
 for i in $(seq 1 90); do
-    if python -c "
-import urllib.request, sys
-try:
-    urllib.request.urlopen('http://localhost:11434/api/tags', timeout=2)
-    sys.exit(0)
-except Exception:
-    sys.exit(1)
-" 2>/dev/null; then
+    if (echo > /dev/tcp/localhost/11434) 2>/dev/null; then
         ok "Ollama ready"
         break
     fi
@@ -170,13 +156,11 @@ if [[ "$LLM_PROVIDER" == "ollama" ]]; then
     done
 
     for model in "${MODELS_TO_PULL[@]}"; do
-        # Check if model is already present (match on name prefix before ':')
-        _base="${model%%:*}"
-        if docker exec janus-ollama ollama list 2>/dev/null | awk 'NR>1{print $1}' | grep -q "^${_base}"; then
+        if docker exec janus-ollama ollama list 2>/dev/null | awk 'NR>1{print $1}' | grep -qxF "$model"; then
             ok "$model already present"
         else
             log "Pulling ${BOLD}${model}${NC} — this may take several minutes on first run..."
-            docker exec -it janus-ollama ollama pull "$model"
+            docker exec janus-ollama ollama pull "$model"
             ok "$model downloaded"
         fi
     done

@@ -38,21 +38,32 @@ if [[ "$MODE" == "--help" || "$MODE" == "-h" ]]; then
     exit 0
 fi
 
-# ── .env ──────────────────────────────────────────────────────────────────────
+# ── config.yaml ───────────────────────────────────────────────────────────────
 hdr "Environment"
-if [[ ! -f .env ]]; then
-    cp .env.example .env
-    warn ".env not found — created from .env.example. Set your API keys before production use."
-else
-    ok ".env present"
+if [[ ! -f config.yaml ]]; then
+    cp config.yaml.example config.yaml
+    warn "config.yaml not found — created from config.yaml.example. Edit it before production use."
 fi
+ok "config.yaml present"
 
-# Load env vars: strip comments and blank lines, remove inline comments
+# Export simple scalar values from config.yaml into the shell environment.
+# Multi-line prompt keys are skipped — Python reads them directly via config.py.
 _load_env() {
-    set -o allexport
-    # shellcheck source=.env
-    source <(grep -v '^\s*[#;]' .env | grep -v '^\s*$' | sed 's/[[:space:]]*#.*//' | tr -d '\r')
-    set +o allexport
+    eval "$(python3 - <<'PYEOF'
+import yaml, shlex, sys
+_PROMPT_KEYS = {"amygdala_system_prompt", "bg_system_prompt", "bg_gate_system_prompt", "pfc_system_prompt"}
+try:
+    cfg = yaml.safe_load(open("config.yaml")) or {}
+except Exception as e:
+    sys.stderr.write(f"Warning: could not read config.yaml: {e}\n")
+    sys.exit(0)
+for k, v in cfg.items():
+    if k in _PROMPT_KEYS:
+        continue
+    if isinstance(v, (str, int, float)) and v is not None:
+        print(f"export {k.upper()}={shlex.quote(str(v))}")
+PYEOF
+    )"
 }
 _load_env
 

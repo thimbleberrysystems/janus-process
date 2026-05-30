@@ -1,0 +1,110 @@
+# config.yaml — Janus Process configuration.
+# Copy this file to config.yaml and edit as needed.
+# config.yaml is git-ignored; this example file is committed.
+#
+# Priority: environment variable > config.yaml > built-in default
+# (Environment variables always win, so Docker / CI overrides still work.)
+
+# ── LLM provider ──────────────────────────────────────────────────────────────
+llm_provider: ollama          # "ollama" (local, default) | "openai" (cloud)
+
+# ── Ollama  (used when llm_provider: ollama) ──────────────────────────────────
+ollama_url: http://127.0.0.1:11434
+ollama_model: qwen2.5:7b              # general fallback for any brain-part not overridden
+ollama_embedding_model: nomic-embed-text
+
+# ── OpenAI  (used when llm_provider: openai) ──────────────────────────────────
+openai_api_key: ""
+openai_model: gpt-4o
+openai_embedding_model: text-embedding-3-small
+
+# ── LangSmith (optional — leave blank to disable tracing) ────────────────────
+langsmith_api_key: ""
+langsmith_project: janus-process
+
+# ── Redis (Short-Term Memory) ─────────────────────────────────────────────────
+redis_url: redis://localhost:6379
+session_id: brain_session
+stm_ttl: 7200                         # seconds; must be > consolidation_interval_seconds
+
+# ── Memory Consolidation ──────────────────────────────────────────────────────
+consolidation_interval_seconds: 1800  # STM→LTM every 30 min (Tier 1)
+consolidation_window: 50              # max STM messages per consolidation pass
+ltm_summarization_interval_seconds: 86400  # LTM→LTM daily compression (Tier 2)
+ltm_summarization_min_docs: 20        # skip Tier-2 if fewer docs than this
+
+# ── ChromaDB (Long-Term Memory) ───────────────────────────────────────────────
+chroma_persist_dir: ./chroma_db
+chroma_host: localhost
+chroma_port: 8000
+
+# ── Database (Basal Ganglia — Procedural Store) ───────────────────────────────
+database_url: sqlite:///./habits.db
+
+# ── LLM Retry ─────────────────────────────────────────────────────────────────
+llm_retry_attempts: 3
+llm_retry_backoff_multiplier: 0.5
+llm_retry_max_wait: 10
+
+# ── Per-brain model overrides ─────────────────────────────────────────────────
+# Ollama suggestions:  amygdala/bg → llama3.2:3b (fast)   pfc/consolidation → qwen2.5:7b
+# OpenAI suggestions:  amygdala/bg → gpt-4o-mini           pfc/consolidation → gpt-4o
+
+# ── Amygdala ──────────────────────────────────────────────────────────────────
+amygdala_model: llama3.2:3b
+amygdala_threshold_low: 0.2
+amygdala_threshold_mid: 0.5
+amygdala_threshold_high: 0.7
+amygdala_temp_neutral: 0.7
+amygdala_temp_mild: 0.5
+amygdala_temp_stressed: 0.3
+amygdala_temp_crisis: 0.1
+
+# ── PFC ───────────────────────────────────────────────────────────────────────
+pfc_model: qwen2.5:7b
+pfc_consolidation_threshold: 0.5
+pfc_stm_window: 10
+pfc_default_temperature: 0.3
+
+# ── Basal Ganglia ─────────────────────────────────────────────────────────────
+bg_model: llama3.2:3b
+
+# ── PFC <> Basal Ganglia Recurrent Loop ───────────────────────────────────────
+max_pfc_loops: 2                      # max refinement iterations before best-effort reply
+
+# ── Rate Limiting (API server) ────────────────────────────────────────────────
+rate_limit_max_calls: 10              # max requests per window per IP
+rate_limit_window_seconds: 60         # sliding window duration (seconds)
+
+# ── Hippocampus ───────────────────────────────────────────────────────────────
+hippocampus_threshold: 0.5
+hippocampus_k: 5
+hippocampus_search_type: mmr
+hippocampus_collection: episodic
+
+# ── Memory Consolidation (extended) ───────────────────────────────────────────
+consolidation_collection: episodic
+consolidation_llm_temperature: 0.3
+consolidation_model: qwen2.5:7b
+
+# ── System Prompts ────────────────────────────────────────────────────────────
+# YAML literal block scalars (|) handle any characters without quoting issues.
+# Edit freely — no escaping needed.
+
+amygdala_system_prompt: |
+  You are an emotional salience classifier.
+  Rate the emotional urgency of the input from 0.0 (completely neutral) to 1.0 (crisis level).
+  Reply with ONLY a single decimal number.
+
+bg_system_prompt: |
+  You are a habit pattern classifier.
+  Match the user input to a known habit ID or reply NONE. No explanation.
+
+bg_gate_system_prompt: |
+  Evaluate whether the proposed response is appropriate and helpful.
+  Reply ACCEPT if good, or REFINE: <specific fix instruction> if it needs improvement.
+
+pfc_system_prompt: |
+  You are the reasoning core (PFC).
+  Synthesise the user input, working memory, retrieved memories and any procedural match
+  into one clear helpful response. Be concise and direct.

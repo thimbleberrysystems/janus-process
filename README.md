@@ -43,69 +43,59 @@ The result is an AI reasoning engine that is:
 ```mermaid
 flowchart TD
     User(["👤 User Input"])
-    API["🌐 FastAPI\n(REST · WebSocket)"]
 
-    subgraph BRAIN ["🧠  Janus Brain  —  LangGraph StateGraph"]
+    subgraph BRAIN ["🧠 The AI Brain (Cognitive Architecture)"]
         direction TB
 
-        AMY["💢 Amygdala\n─────────────\nEmotional salience scorer\nDerives llm_temperature\n& emotional_directive\ngpt-4o-mini"]
+        AMY["💢 Emotion Engine\nReads the user's mood and urgency"]
 
-        BG["⚙️ Basal Ganglia\n─────────────\nHabit pattern matcher\nSQLite habit store\ngpt-4o-mini"]
+        BG_FAST["⚙️ Fast-Path\nInstant answers for known routines"]
 
-        HIPP["🔍 Hippocampus\n─────────────\nRAG retrieval\nChromaDB vector store\ntext-embedding-3-small"]
+        HIPP["🔍 Memory Retrieval\nRecalls past experiences"]
 
-        PFC["🧩 PFC  (Prefrontal Cortex)\n─────────────\nCore reasoning agent\nSTM + LTM + directive + feedback\ngpt-4o  ·  dynamic temperature"]
+        PFC["🧩 Deep Reasoning\nCarefully thinks and drafts an answer"]
 
-        GATE["🚦 Basal Ganglia Gate\n─────────────\nPost-PFC quality evaluator\nACCEPT  /  REFINE + feedback\ngpt-4o-mini"]
+        GATE["🚦 Quality Gate\nReviews and improves the answer before speaking"]
     end
 
-    subgraph MEMORY ["💾  Memory Layer"]
-        STM["⚡ Short-Term Memory\nRedis  ·  TTL-decayed\nLast-N conversation turns"]
-        LTM["🗄️ Long-Term Memory\nChromaDB  ·  Vector search\nEpisodic · Semantic · Procedural"]
-        HABITS["📋 Habit Store\nSQLite  ·  pattern + response\nhit_count tracking"]
+    subgraph STORAGE ["💾 Memory Storage"]
+        direction TB
+        STM["⚡ Short-Term\nRecent conversation"]
+        LTM["🗄️ Long-Term\nPast experiences"]
     end
 
-    subgraph OBSERVE ["📡  Observability"]
-        LS["LangSmith\nPer-node traces\nLatency · Token usage"]
-    end
+    User -->|"Message"| AMY
+    AMY -->|"Mood & Instructions"| BG_FAST
 
-    User --> API --> AMY
-    AMY -->|"emotional_weight\nllm_temperature\nemotional_directive"| BG
+    BG_FAST -->|"Known routine? (Fast Answer)"| PFC
+    BG_FAST -->|"New problem?"| HIPP
 
-    BG -->|"habit match\nprocedural_match set"| PFC
-    BG -->|"no habit\nhigh emotion"| HIPP
-    BG -->|"no habit\nlow emotion"| PFC
-    HIPP -->|"retrieved_memories"| PFC
+    HIPP -->|"Relevant history"| PFC
 
-    PFC -->|"habit path → skip gate"| OUT(["✅ Response"])
-    PFC -->|"deliberate path"| GATE
+    PFC <-->|"Reads/Writes"| STM
+    HIPP <-->|"Reads/Writes"| LTM
 
-    GATE -->|"ACCEPT"| OUT
-    GATE -->|"REFINE  &  loop_count < MAX"| PFC
-    GATE -->|"budget exhausted"| OUT
+    PFC -->|"Draft Answer"| GATE
+    GATE -->|"Needs improvement (Loop)"| PFC
+    GATE -->|"Perfect!"| OUT(["✅ Response to User"])
 
-    PFC <-->|"read / write"| STM
-    HIPP <-->|"retrieve / encode"| LTM
-    BG <-->|"lookup"| HABITS
-    BRAIN -.->|"trace every node"| LS
+    %% Sleep Cycle / Consolidation
+    STM -.->|"Sleep Cycle (Summarisation)"| LTM
 
     style BRAIN fill:#0f172a,stroke:#334155,color:#f1f5f9
-    style MEMORY fill:#1e1b4b,stroke:#4338ca,color:#e0e7ff
-    style OBSERVE fill:#1a1a2e,stroke:#6d28d9,color:#ede9fe
+    style STORAGE fill:#1e1b4b,stroke:#4338ca,color:#e0e7ff,stroke-dasharray: 5 5
     style AMY fill:#7f1d1d,stroke:#ef4444,color:#fef2f2
-    style BG fill:#1c1917,stroke:#a8a29e,color:#f5f5f4
+    style BG_FAST fill:#1c1917,stroke:#a8a29e,color:#f5f5f4
     style HIPP fill:#052e16,stroke:#22c55e,color:#f0fdf4
     style PFC fill:#1e3a5f,stroke:#3b82f6,color:#eff6ff
     style GATE fill:#451a03,stroke:#f97316,color:#fff7ed
     style STM fill:#450a0a,stroke:#dc2626,color:#fef2f2
     style LTM fill:#1e3a5f,stroke:#6366f1,color:#eef2ff
-    style HABITS fill:#1c1917,stroke:#78716c,color:#fafaf9
-    style LS fill:#2d1b69,stroke:#a78bfa,color:#f5f3ff
 ```
 
 ---
 
-## The Five Cognitive Agents
+## The Cognitive Agents & Processes
 
 ### 💢 Amygdala — Emotional Threat Detector
 The first node every input passes through. Rates emotional salience (0.0–1.0) and dynamically adjusts downstream behaviour:
@@ -135,6 +125,9 @@ PFC proposal → Gate evaluation
     REFINE  ──► (loop_count < MAX_PFC_LOOPS) ──► PFC
     REFINE  ──► (budget exhausted) ──────────────► best-effort response
 ```
+
+### 💤 Memory Consolidator — The "Sleep Cycle" (Summarisation)
+Like biological sleep, the system periodically compresses and summarises the recent Short-Term Memory (STM) into a single episodic Long-Term Memory (LTM). Using an LLM-driven process, redundant conversation turns are consolidated into concise context, keeping persistent memory retrieval sharp, token-efficient, and deduplicated.
 
 ---
 

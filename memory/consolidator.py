@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 from typing import Any
 
 from langchain_core.embeddings import Embeddings
@@ -27,6 +28,7 @@ from langchain_core.messages import HumanMessage
 
 from config import (
     CONSOLIDATION_COLLECTION,
+    CONSOLIDATION_INTERVAL_SECONDS,
     CONSOLIDATION_LLM_TEMPERATURE,
     CONSOLIDATION_MODEL,
     CONSOLIDATION_WINDOW,
@@ -40,6 +42,8 @@ from memory.short_term import get_short_term_memory
 from models.brain_state import BrainState
 
 logger = logging.getLogger(__name__)
+
+_last_consolidation_time: float = 0.0  # monotonic clock; updated after each on-demand run
 
 DEFAULT_COLLECTION: str = CONSOLIDATION_COLLECTION
 
@@ -206,11 +210,26 @@ def consolidate(
 def maybe_consolidate(state: BrainState, **kwargs: Any) -> None:
     """Trigger consolidation when ``state["should_consolidate"]`` is ``True``.
 
+    Enforces a cooldown of ``CONSOLIDATION_INTERVAL_SECONDS`` so that rapid
+    back-to-back emotional turns do not each trigger a full consolidation pass
+    mid-conversation.  The scheduler path (``start_scheduler``) is unaffected.
+
     Passes all *kwargs* through to :func:`consolidate`.
     """
-    if state.get("should_consolidate"):
-        logger.info("Consolidator: should_consolidate flag set — running consolidation")
-        consolidate(**kwargs)
+    global _last_consolidation_time
+    if not state.get("should_consolidate"):
+        return
+    elapsed = time.monotonic() - _last_consolidation_time
+    if elapsed < CONSOLIDATION_INTERVAL_SECONDS:
+        logger.debug(
+            "Consolidator: skipping on-demand run — only %.0fs since last consolidation (min %ds)",
+            elapsed,
+            CONSOLIDATION_INTERVAL_SECONDS,
+        )
+        return
+    logger.info("Consolidator: should_consolidate flag set — running consolidation")
+    consolidate(**kwargs)
+    _last_consolidation_time = time.monotonic()
 
 
 

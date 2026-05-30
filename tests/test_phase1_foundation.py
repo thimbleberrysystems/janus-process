@@ -151,7 +151,7 @@ class TestConfigLoadsEnvVars:
         assert config.REDIS_URL == "redis://localhost:6379"
         assert config.CHROMA_PERSIST_DIR == "./chroma_db"
         assert config.LANGSMITH_PROJECT == "janus-process"
-        assert config.STM_TTL == 3600
+        assert config.STM_TTL == 7200
         assert config.CHROMA_PORT == 8000
 
     def test_stm_ttl_cast_to_int(self, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -205,6 +205,21 @@ class TestConsolidate:
 # ---------------------------------------------------------------------------
 
 class TestMaybeConsolidate:
+    def setup_method(self):
+        """Reset the on-demand cooldown clock before every test."""
+        import memory.consolidator as _m
+        _m._last_consolidation_time = 0.0
+
+    def test_cooldown_prevents_rapid_refire(self, chroma, fake_embed):
+        """Second call within CONSOLIDATION_INTERVAL_SECONDS must be skipped."""
+        state = {**default_brain_state("test"), "should_consolidate": True}
+        with patch("memory.consolidator.consolidate"):
+            maybe_consolidate(state, chroma_client=chroma, embedding_fn=fake_embed)
+        # _last_consolidation_time is now ~now; second call should be skipped
+        with patch("memory.consolidator.consolidate") as mock2:
+            maybe_consolidate(state, chroma_client=chroma, embedding_fn=fake_embed)
+        mock2.assert_not_called()
+
     def test_consolidator_triggered_by_flag(self, chroma, fake_embed):
         """should_consolidate=True → consolidate() is called once."""
         state = {**default_brain_state("test"), "should_consolidate": True}

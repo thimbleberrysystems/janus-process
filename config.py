@@ -83,3 +83,9 @@ CONSOLIDATION_LLM_TEMPERATURE: float = float(os.environ.get("CONSOLIDATION_LLM_T
 CONSOLIDATION_MODEL: str = os.environ.get("CONSOLIDATION_MODEL", "gpt-4o")
 LTM_SUMMARIZATION_INTERVAL_SECONDS: int = int(os.environ.get("LTM_SUMMARIZATION_INTERVAL_SECONDS", "86400"))  # daily
 LTM_SUMMARIZATION_MIN_DOCS: int = int(os.environ.get("LTM_SUMMARIZATION_MIN_DOCS", "20"))  # skip if fewer docs
+
+# ── System Prompts (source of truth: .env.example) ───────────────────────────
+AMYGDALA_SYSTEM_PROMPT: str = os.environ.get("AMYGDALA_SYSTEM_PROMPT", "").replace("\\n", "\n")
+BG_SYSTEM_PROMPT: str = os.environ.get("BG_SYSTEM_PROMPT", "").replace("\\n", "\n")
+BG_GATE_SYSTEM_PROMPT: str = os.environ.get("BG_GATE_SYSTEM_PROMPT", "").replace("\\n", "\n")
+PFC_SYSTEM_PROMPT: str = os.environ.get("PFC_SYSTEM_PROMPT", "").replace("\\n", "\n")

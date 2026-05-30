@@ -18,7 +18,7 @@ import logging
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from config import PFC_CONSOLIDATION_THRESHOLD, PFC_DEFAULT_TEMPERATURE, PFC_MODEL, PFC_STM_WINDOW
+from config import PFC_CONSOLIDATION_THRESHOLD, PFC_DEFAULT_TEMPERATURE, PFC_MODEL, PFC_STM_WINDOW, PFC_SYSTEM_PROMPT
 from memory.short_term import add_to_short_term, get_short_term_memory
 from models.brain_state import BrainState
 from providers.llm import get_llm
@@ -28,23 +28,7 @@ _log = logging.getLogger("janus.pfc")
 CONSOLIDATION_THRESHOLD: float = PFC_CONSOLIDATION_THRESHOLD
 STM_WINDOW: int = PFC_STM_WINDOW
 
-_SYSTEM_PROMPT = (
-    "You are the Prefrontal Cortex (PFC) — the core reasoning and synthesis "
-    "centre of a brain-inspired AI system.\n\n"
-    "You receive:\n"
-    "  • The user's current input\n"
-    "  • Working memory: the most recent conversation turns (short-term memory)\n"
-    "  • Retrieved memories: relevant long-term memories retrieved from a vector "
-    "store\n"
-    "  • Procedural match: a pre-learned habitual response if one was found "
-    "(may be absent)\n\n"
-    "Your task: synthesise all of the above into a single, coherent, helpful "
-    "response to the user's input. Use working memory for conversational "
-    "continuity, retrieved memories for relevant background knowledge, and the "
-    "procedural match (if present) as a strong starting signal.\n\n"
-    "Be concise and direct. Do not mention that you are an AI or reference "
-    "these internal memory systems in your response."
-)
+# PFC reasoning prompt loaded from config.PFC_SYSTEM_PROMPT
 
 
 def _build_context_block(state: BrainState) -> str:
@@ -107,7 +91,7 @@ def pfc_node(
     # ── 2. Build prompt and run LLM ───────────────────────────────────────────
     context_block = _build_context_block(state)
     directive = (state.get("emotional_directive") or "").strip()
-    system_content = f"{directive}\n\n{_SYSTEM_PROMPT}" if directive else _SYSTEM_PROMPT
+    system_content = f"{directive}\n\n{PFC_SYSTEM_PROMPT}" if directive else PFC_SYSTEM_PROMPT
     messages = [
         SystemMessage(content=system_content),
         HumanMessage(content=context_block),

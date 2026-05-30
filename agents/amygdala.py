@@ -22,6 +22,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from config import (
     AMYGDALA_MODEL,
+    AMYGDALA_SYSTEM_PROMPT,
     AMYGDALA_TEMP_CRISIS,
     AMYGDALA_TEMP_MILD,
     AMYGDALA_TEMP_NEUTRAL,
@@ -33,20 +34,7 @@ from config import (
 from models.brain_state import BrainState
 from providers.llm import get_llm
 
-# ── Prompt ─────────────────────────────────────────────────────────────────────
-
-_SYSTEM_PROMPT = """\
-You are an emotional salience classifier.
-Rate how emotionally charged or urgent the following input is on a scale \
-from 0.0 to 1.0.
-
-Calibration guide:
-  0.0 — completely neutral (e.g., "What is 2 + 2?", "Set a reminder")
-  0.3 — mildly personal or moderately important
-  0.6 — clearly emotional or stressful
-  1.0 — crisis-level or highly distressing (grief, fear, rage, emergency)
-
-Reply with ONLY a single decimal number between 0.0 and 1.0. Nothing else."""
+# ── Prompt (loaded from config.AMYGDALA_SYSTEM_PROMPT; override via AMYGDALA_SYSTEM_PROMPT env var) ──
 
 # ── Score parsing ──────────────────────────────────────────────────────────────
 
@@ -116,7 +104,7 @@ def amygdala_node(
     _llm = llm or get_llm(model_name=AMYGDALA_MODEL, temperature=0.0)
 
     messages = [
-        SystemMessage(content=_SYSTEM_PROMPT),
+        SystemMessage(content=AMYGDALA_SYSTEM_PROMPT),
         HumanMessage(content=state["input"]),
     ]
 

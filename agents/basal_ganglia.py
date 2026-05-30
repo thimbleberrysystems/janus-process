@@ -35,7 +35,7 @@ import sqlite3
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from config import BG_MODEL, DATABASE_URL
+from config import BG_GATE_SYSTEM_PROMPT, BG_MODEL, BG_SYSTEM_PROMPT, DATABASE_URL
 from models.brain_state import BrainState
 from providers.llm import get_llm
 
@@ -50,16 +50,7 @@ CREATE TABLE IF NOT EXISTS habits (
 )
 """
 
-_SYSTEM_PROMPT = """\
-You are a habit pattern classifier.
-
-You will be given a list of known habit patterns (each with an ID and a description) \
-and a user input.  Decide whether the user input has the same intent as any listed \
-habit pattern.
-
-Reply with ONLY the integer ID of the matching habit.
-If no habit matches, reply with ONLY the word NONE.
-Do not explain your answer."""
+# habit-classifier prompt loaded from config.BG_SYSTEM_PROMPT
 
 _INT_RE = re.compile(r"\b(\d+)\b")
 
@@ -140,7 +131,7 @@ def _classify(
     )
     human_content = f"Habits:\n{habit_list}\n\nUser input: {user_input}"
     messages = [
-        SystemMessage(content=_SYSTEM_PROMPT),
+        SystemMessage(content=BG_SYSTEM_PROMPT),
         HumanMessage(content=human_content),
     ]
     response = str(llm.invoke(messages).content).strip()
@@ -151,19 +142,7 @@ def _classify(
 
 # ── Gate prompt ──────────────────────────────────────────────────────────────
 
-_GATE_SYSTEM_PROMPT = """\
-You are a response quality evaluator for a brain-inspired AI system.
-
-You will receive the user's original input and a proposed response.
-Evaluate whether the response is appropriate, helpful, accurate, and relevant.
-
-If the response is acceptable, reply with exactly:
-  ACCEPT
-
-If the response needs improvement, reply with:
-  REFINE: <concise, specific instruction on exactly what to fix>
-
-Do not explain your reasoning beyond the instruction."""
+# ── Gate prompt (loaded from config.BG_GATE_SYSTEM_PROMPT; override via BG_GATE_SYSTEM_PROMPT env var) ──
 
 
 def basal_ganglia_gate_node(
@@ -192,7 +171,7 @@ def basal_ganglia_gate_node(
         f"User input: {state['input']}\n\nProposed response: {proposal}"
     )
     messages = [
-        SystemMessage(content=_GATE_SYSTEM_PROMPT),
+        SystemMessage(content=BG_GATE_SYSTEM_PROMPT),
         HumanMessage(content=human_content),
     ]
     raw = str(_llm.invoke(messages).content).strip()

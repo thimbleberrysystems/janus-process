@@ -11,6 +11,7 @@ Public surface
 consolidate(...)          — run one consolidation pass; returns count written.
 maybe_consolidate(state)  — call consolidate() only when state["should_consolidate"]
                             is True.
+consolidate_ltm(...)       — compress old LTM docs into a meta-summary (LTM→LTM).
 start_scheduler(interval) — start a background APScheduler job for periodic
                             consolidation.
 """
@@ -29,6 +30,8 @@ from config import (
     CONSOLIDATION_LLM_TEMPERATURE,
     CONSOLIDATION_MODEL,
     CONSOLIDATION_WINDOW,
+    LTM_SUMMARIZATION_INTERVAL_SECONDS,
+    LTM_SUMMARIZATION_MIN_DOCS,
     SESSION_ID,
     STM_TTL,
 )
@@ -118,6 +121,12 @@ def consolidate(
     When *summarize* is ``False`` each message is stored individually (legacy
     behaviour), also with per-message dedup.
 
+    .. warning::
+        The ``summarize=False`` path stores raw conversation turns verbatim. It
+        exists only for testing and back-compat. All production call-sites must
+        use the default ``summarize=True`` to satisfy the design invariant that
+        LTM contains only LLM-generated summaries, never raw chat logs.
+
     Parameters
     ----------
     session_id:    Redis session key.
@@ -204,16 +213,105 @@ def maybe_consolidate(state: BrainState, **kwargs: Any) -> None:
         consolidate(**kwargs)
 
 
-def start_scheduler(
-    interval_seconds: int = 3600,
-    **consolidate_kwargs: Any,
-):
-    """Start an APScheduler background job that calls :func:`consolidate` on a
-    fixed interval.
+
+
+_LTM_COMPRESS_PROMPT = (
+    "You are a long-term memory compression system. The following documents are "
+    "episodic memories stored over time. Compress them into a single high-level "
+    "summary that preserves key facts, patterns, decisions, and context. "
+    "Be factual and concise.\n\nDocuments:\n{documents}\n\nCompressed memory:"
+)
+
+
+def consolidate_ltm(
+    *,
+    collection: str = DEFAULT_COLLECTION,
+    min_docs: int = LTM_SUMMARIZATION_MIN_DOCS,
+    embedding_fn: Embeddings | None = None,
+    chroma_client: Any = None,
+    llm: Any = None,
+) -> int:
+    """Compress all documents in an LTM collection into a single meta-summary.
+
+    Reads every document currently in *collection*, asks the LLM to produce a
+    high-level compressed memory, deletes the originals, and stores the
+    meta-summary back in the same collection.
+
+    Skips (returns 0) when the document count is below *min_docs*, preventing
+    compression of an already-small collection.
 
     Parameters
     ----------
-    interval_seconds:     How often to run consolidation (default: 1 hour).
+    collection:    Target ChromaDB collection (default: ``"episodic"``).
+    min_docs:      Minimum number of documents required to trigger compression.
+    embedding_fn:  Embeddings callable for ChromaDB.
+    chroma_client: ChromaDB client.
+    llm:           LLM instance (uses configured provider if None).
+
+    Returns
+    -------
+    Number of documents replaced by the meta-summary (0 when skipped).
+    """
+    _client = chroma_client if chroma_client is not None else _http_client()
+    col = _client.get_or_create_collection(collection)
+
+    result = col.get(include=["documents", "metadatas"])
+    docs: list[str] = result.get("documents") or []
+    ids: list[str] = result.get("ids") or []
+
+    if len(docs) < min_docs:
+        logger.info(
+            "LTM consolidate: %d docs < min_docs=%d in collection=%r — skipping",
+            len(docs),
+            min_docs,
+            collection,
+        )
+        return 0
+
+    from providers.llm import get_llm
+
+    _llm = llm or get_llm(model_name=CONSOLIDATION_MODEL, temperature=CONSOLIDATION_LLM_TEMPERATURE)
+    numbered = "\n".join(f"{i + 1}. {d}" for i, d in enumerate(docs))
+    prompt = _LTM_COMPRESS_PROMPT.format(documents=numbered)
+    from langchain_core.messages import HumanMessage as _HumanMessage
+    response = _llm.invoke([_HumanMessage(content=prompt)])
+    meta_summary = str(response.content).strip()
+
+    col.delete(ids=ids)
+    add_to_ltm(
+        meta_summary,
+        {
+            "source": "ltm_compressed",
+            "doc_count": len(docs),
+        },
+        collection,
+        embedding_fn=embedding_fn,
+        chroma_client=_client,
+    )
+    logger.info(
+        "LTM consolidate: compressed %d docs \u2192 1 meta-summary (collection=%r)",
+        len(docs),
+        collection,
+    )
+    return len(docs)
+
+def start_scheduler(
+    interval_seconds: int = 3600,
+    ltm_interval_seconds: int = LTM_SUMMARIZATION_INTERVAL_SECONDS,
+    **consolidate_kwargs: Any,
+):
+    """Start APScheduler background jobs for STM\u2192LTM and LTM\u2192LTM consolidation.
+
+    Two jobs are registered:
+    - ``memory_consolidator``: runs :func:`consolidate` (STM \u2192 LTM summary) every
+      *interval_seconds*.
+    - ``ltm_consolidator``: runs :func:`consolidate_ltm` (LTM \u2192 compressed LTM) every
+      *ltm_interval_seconds* (default: daily).
+
+    Parameters
+    ----------
+    interval_seconds:     STM\u2192LTM interval (default: 30 minutes).
+    ltm_interval_seconds: LTM\u2192LTM compression interval (default: 24 hours).
     **consolidate_kwargs: Forwarded to :func:`consolidate` on each run.
 
     Returns
@@ -232,10 +330,18 @@ def start_scheduler(
         id="memory_consolidator",
         replace_existing=True,
     )
+    scheduler.add_job(
+        consolidate_ltm,
+        "interval",
+        seconds=ltm_interval_seconds,
+        id="ltm_consolidator",
+        replace_existing=True,
+    )
     scheduler.start()
     logger.info(
-        "Consolidator scheduler started (interval=%ds, summarize=%s)",
+        "Consolidator scheduler started (stm_interval=%ds, ltm_interval=%ds, summarize=%s)",
         interval_seconds,
+        ltm_interval_seconds,
         consolidate_kwargs.get("summarize", True),
     )
     return scheduler

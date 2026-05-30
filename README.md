@@ -11,7 +11,7 @@
 [![Redis](https://img.shields.io/badge/Redis-STM-DC382D?logo=redis&logoColor=white)](https://redis.io)
 [![ChromaDB](https://img.shields.io/badge/ChromaDB-Vector%20LTM-F97316)](https://trychroma.com)
 [![OpenAI](https://img.shields.io/badge/OpenAI-GPT--4o-412991?logo=openai&logoColor=white)](https://openai.com)
-[![Tests](https://img.shields.io/badge/tests-258%20passing-22C55E?logo=pytest&logoColor=white)](tests/)
+[![Tests](https://img.shields.io/badge/tests-269%20passing-22C55E?logo=pytest&logoColor=white)](tests/)
 [![LangSmith](https://img.shields.io/badge/LangSmith-Observability-F59E0B)](https://smith.langchain.com)
 
 </div>
@@ -32,7 +32,7 @@ The result is an AI reasoning engine that is:
 |---|---|---|
 | Emotionally-aware | ✅ Dynamic temperature + directive injection | ❌ Static prompts |
 | Self-correcting | ✅ Iterative PFC ↔ BG refinement loop | ❌ Single-shot generation |
-| Persistent memory | ✅ Two-tier STM (Redis) + LTM (ChromaDB) | ❌ Stateless per request |
+| Persistent memory | ✅ STM (Redis TTL) + LTM (ChromaDB) with two-level sleep-cycle compression | ❌ Stateless per request |
 | Habit/procedural fast-path | ✅ SQLite habit store, bypasses LLM | ❌ Every query hits the LLM |
 | Production observable | ✅ LangSmith tracing per agent node | ❌ Black-box inference |
 
@@ -80,7 +80,8 @@ flowchart TD
     GATE -->|"Perfect!"| OUT(["✅ Response to User"])
 
     %% Sleep Cycle / Consolidation
-    STM -.->|"Sleep Cycle (Summarisation)"| LTM
+    STM -.->|"Tier 1: STM→LTM every 30 min"| LTM
+    LTM -.->|"Tier 2: LTM→LTM daily (compress N→1)"| LTM
 
     style BRAIN fill:#0f172a,stroke:#334155,color:#f1f5f9
     style STORAGE fill:#1e1b4b,stroke:#4338ca,color:#e0e7ff,stroke-dasharray: 5 5
@@ -126,8 +127,14 @@ PFC proposal → Gate evaluation
     REFINE  ──► (budget exhausted) ──────────────► best-effort response
 ```
 
-### 💤 Memory Consolidator — The "Sleep Cycle" (Summarisation)
-Like biological sleep, the system periodically compresses and summarises the recent Short-Term Memory (STM) into a single episodic Long-Term Memory (LTM). Using an LLM-driven process, redundant conversation turns are consolidated into concise context, keeping persistent memory retrieval sharp, token-efficient, and deduplicated.
+### 💤 Memory Consolidator — Two-Level "Sleep Cycle" (Summarisation)
+Like biological sleep, the system runs two tiers of memory consolidation, both using LLM-driven summarisation rather than raw dumps:
+
+**Tier 1 — STM → LTM (every 30 min):** The last 50 Short-Term Memory messages are LLM-summarised into a single episodic memory document and written to ChromaDB. The raw batch is SHA-256 hashed so identical windows are never re-stored. This is also triggered on-demand after any emotionally significant turn (`emotional_weight ≥ 0.5`).
+
+**Tier 2 — LTM → Compressed LTM (daily):** Once a ChromaDB collection grows beyond 20 documents, all existing summaries are fed to the LLM as a second-pass compression step. The N individual summaries are replaced by a single high-level meta-summary, preventing the retrieval index from degrading as memory accumulates over time.
+
+**Race-condition fix:** `STM_TTL` (2 hours) is always greater than `CONSOLIDATION_INTERVAL_SECONDS` (30 min), ensuring the scheduler reads STM before Redis can expire it.
 
 ---
 

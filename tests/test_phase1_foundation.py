@@ -11,9 +11,12 @@ Tests verify:
 """
 import importlib
 import socket
+from unittest.mock import patch
 
 import pytest
 
+import main
+from main import think
 from models.brain_state import (
     default_brain_state,
     validate_brain_state,
@@ -196,10 +199,6 @@ class _PassthroughGraph:
 class TestStubGraph:
     def test_returns_brain_state(self) -> None:
         """think() returns a dict with all BrainState keys."""
-        from unittest.mock import patch
-
-        import main
-        from main import think
         with patch.object(main, "brain", _PassthroughGraph()):
             result = think("hello world")
         assert isinstance(result, dict)
@@ -208,20 +207,12 @@ class TestStubGraph:
 
     def test_input_preserved(self) -> None:
         """The input field in the returned state matches what was passed in."""
-        from unittest.mock import patch
-
-        import main
-        from main import think
         with patch.object(main, "brain", _PassthroughGraph()):
             result = think("stub test input")
         assert result["input"] == "stub test input"
 
     def test_defaults_unchanged_by_stub(self) -> None:
         """think() with a passthrough graph preserves all default field values."""
-        from unittest.mock import patch
-
-        import main
-        from main import think
         with patch.object(main, "brain", _PassthroughGraph()):
             result = think("anything")
         assert result["emotional_weight"] == 0.0

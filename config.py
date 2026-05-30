@@ -20,7 +20,7 @@ LANGSMITH_PROJECT: str = os.environ.get("LANGSMITH_PROJECT", "janus-process")
 # ── Redis ─────────────────────────────────────────────────────────────────────
 REDIS_URL: str = os.environ.get("REDIS_URL", "redis://localhost:6379")
 SESSION_ID: str = os.environ.get("SESSION_ID", "brain_session")
-STM_TTL: int = int(os.environ.get("STM_TTL", "3600"))
+STM_TTL: int = int(os.environ.get("STM_TTL", "7200"))  # 2 hours; must be > CONSOLIDATION_INTERVAL_SECONDS
 
 # ── ChromaDB ──────────────────────────────────────────────────────────────────
 CHROMA_PERSIST_DIR: str = os.environ.get("CHROMA_PERSIST_DIR", "./chroma_db")
@@ -38,7 +38,7 @@ DATABASE_URL: str = os.environ.get("DATABASE_URL", "sqlite:///./habits.db")
 
 
 # ── Memory Consolidation ──────────────────────────────────────────────────────
-CONSOLIDATION_INTERVAL_SECONDS: int = int(os.environ.get("CONSOLIDATION_INTERVAL_SECONDS", "3600"))
+CONSOLIDATION_INTERVAL_SECONDS: int = int(os.environ.get("CONSOLIDATION_INTERVAL_SECONDS", "1800"))  # 30 min; < STM_TTL
 CONSOLIDATION_WINDOW: int = int(os.environ.get("CONSOLIDATION_WINDOW", "50"))
 
 # ── PFC ↔ Basal Ganglia Recurrent Loop ────────────────────────────────────────
@@ -81,3 +81,5 @@ HIPPOCAMPUS_COLLECTION: str = os.environ.get("HIPPOCAMPUS_COLLECTION", "episodic
 CONSOLIDATION_COLLECTION: str = os.environ.get("CONSOLIDATION_COLLECTION", "episodic")
 CONSOLIDATION_LLM_TEMPERATURE: float = float(os.environ.get("CONSOLIDATION_LLM_TEMPERATURE", "0.3"))
 CONSOLIDATION_MODEL: str = os.environ.get("CONSOLIDATION_MODEL", "gpt-4o")
+LTM_SUMMARIZATION_INTERVAL_SECONDS: int = int(os.environ.get("LTM_SUMMARIZATION_INTERVAL_SECONDS", "86400"))  # daily
+LTM_SUMMARIZATION_MIN_DOCS: int = int(os.environ.get("LTM_SUMMARIZATION_MIN_DOCS", "20"))  # skip if fewer docs

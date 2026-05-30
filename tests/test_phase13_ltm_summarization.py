@@ -258,3 +258,170 @@ class TestConfig:
         from config import CONSOLIDATION_WINDOW
         assert isinstance(CONSOLIDATION_WINDOW, int)
         assert CONSOLIDATION_WINDOW > 0
+
+
+# ---------------------------------------------------------------------------
+# consolidate_ltm() — LTM-to-LTM compression
+# ---------------------------------------------------------------------------
+
+from memory.consolidator import consolidate_ltm  # noqa: E402 — after other imports
+
+MANY_DOCS = [f"episode {i}: the user discussed topic {i}" for i in range(25)]
+
+
+class TestConsolidateLtm:
+    def _seed_docs(self, chroma, fake_embed, texts):
+        """Insert texts directly into the ephemeral ChromaDB collection."""
+        from memory.long_term import add_batch_to_ltm
+        add_batch_to_ltm(
+            texts,
+            [{"source": "summarized", "hash": f"h{i}"} for i in range(len(texts))],
+            DEFAULT_COLLECTION,
+            embedding_fn=fake_embed,
+            chroma_client=chroma,
+        )
+
+    def test_below_min_docs_skips(self, chroma, fake_embed):
+        """Fewer docs than min_docs → 0 returned, collection unchanged."""
+        self._seed_docs(chroma, fake_embed, MANY_DOCS[:5])
+        llm = _mock_llm("meta summary")
+        count = consolidate_ltm(
+            collection=DEFAULT_COLLECTION,
+            min_docs=20,
+            embedding_fn=fake_embed,
+            chroma_client=chroma,
+            llm=llm,
+        )
+        assert count == 0
+        assert chroma.get_or_create_collection(DEFAULT_COLLECTION).count() == 5
+        llm.invoke.assert_not_called()
+
+    def test_above_min_docs_compresses(self, chroma, fake_embed):
+        """25 docs ≥ min_docs=20 → returns 25, collection has exactly 1 doc."""
+        self._seed_docs(chroma, fake_embed, MANY_DOCS)
+        llm = _mock_llm("Compressed meta-summary of 25 episodes.")
+        count = consolidate_ltm(
+            collection=DEFAULT_COLLECTION,
+            min_docs=20,
+            embedding_fn=fake_embed,
+            chroma_client=chroma,
+            llm=llm,
+        )
+        assert count == 25
+        assert chroma.get_or_create_collection(DEFAULT_COLLECTION).count() == 1
+
+    def test_stored_doc_is_meta_summary(self, chroma, fake_embed):
+        """The stored document must be the LLM output, not a raw doc."""
+        self._seed_docs(chroma, fake_embed, MANY_DOCS)
+        llm = _mock_llm("Unique meta-summary XYZ.")
+        consolidate_ltm(
+            collection=DEFAULT_COLLECTION,
+            min_docs=20,
+            embedding_fn=fake_embed,
+            chroma_client=chroma,
+            llm=llm,
+        )
+        col = chroma.get_or_create_collection(DEFAULT_COLLECTION)
+        remaining = col.get(include=["documents"])
+        assert remaining["documents"] == ["Unique meta-summary XYZ."]
+
+    def test_metadata_source_is_ltm_compressed(self, chroma, fake_embed):
+        """Meta-summary must carry source='ltm_compressed'."""
+        self._seed_docs(chroma, fake_embed, MANY_DOCS)
+        llm = _mock_llm("summary")
+        consolidate_ltm(
+            collection=DEFAULT_COLLECTION,
+            min_docs=20,
+            embedding_fn=fake_embed,
+            chroma_client=chroma,
+            llm=llm,
+        )
+        results = search_ltm_with_metadata(
+            "summary",
+            DEFAULT_COLLECTION,
+            k=1,
+            search_type="similarity",
+            chroma_client=chroma,
+            embedding_fn=fake_embed,
+        )
+        assert results[0]["metadata"]["source"] == "ltm_compressed"
+
+    def test_metadata_doc_count(self, chroma, fake_embed):
+        """Meta-summary metadata must record the number of compressed docs."""
+        self._seed_docs(chroma, fake_embed, MANY_DOCS)
+        llm = _mock_llm("summary")
+        consolidate_ltm(
+            collection=DEFAULT_COLLECTION,
+            min_docs=20,
+            embedding_fn=fake_embed,
+            chroma_client=chroma,
+            llm=llm,
+        )
+        results = search_ltm_with_metadata(
+            "summary",
+            DEFAULT_COLLECTION,
+            k=1,
+            search_type="similarity",
+            chroma_client=chroma,
+            embedding_fn=fake_embed,
+        )
+        assert results[0]["metadata"]["doc_count"] == 25
+
+    def test_empty_collection_skips(self, chroma, fake_embed):
+        """Empty LTM → 0 returned, no LLM call."""
+        llm = _mock_llm("summary")
+        count = consolidate_ltm(
+            collection=DEFAULT_COLLECTION,
+            min_docs=1,
+            embedding_fn=fake_embed,
+            chroma_client=chroma,
+            llm=llm,
+        )
+        assert count == 0
+        llm.invoke.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# start_scheduler — ltm_consolidator job
+# ---------------------------------------------------------------------------
+
+class TestStartSchedulerLtmJob:
+    def test_scheduler_has_ltm_consolidator_job(self):
+        scheduler = start_scheduler(interval_seconds=9999, ltm_interval_seconds=9999)
+        try:
+            job_ids = [j.id for j in scheduler.get_jobs()]
+            assert "ltm_consolidator" in job_ids
+        finally:
+            scheduler.shutdown(wait=False)
+
+    def test_both_jobs_registered(self):
+        scheduler = start_scheduler(interval_seconds=9999, ltm_interval_seconds=9999)
+        try:
+            job_ids = [j.id for j in scheduler.get_jobs()]
+            assert "memory_consolidator" in job_ids
+            assert "ltm_consolidator" in job_ids
+        finally:
+            scheduler.shutdown(wait=False)
+
+
+# ---------------------------------------------------------------------------
+# Config — new constants
+# ---------------------------------------------------------------------------
+
+class TestNewConfig:
+    def test_ltm_summarization_interval_is_int(self):
+        from config import LTM_SUMMARIZATION_INTERVAL_SECONDS
+        assert isinstance(LTM_SUMMARIZATION_INTERVAL_SECONDS, int)
+        assert LTM_SUMMARIZATION_INTERVAL_SECONDS > 0
+
+    def test_ltm_summarization_min_docs_is_int(self):
+        from config import LTM_SUMMARIZATION_MIN_DOCS
+        assert isinstance(LTM_SUMMARIZATION_MIN_DOCS, int)
+        assert LTM_SUMMARIZATION_MIN_DOCS > 0
+
+    def test_stm_ttl_greater_than_consolidation_interval(self):
+        from config import CONSOLIDATION_INTERVAL_SECONDS, STM_TTL
+        assert STM_TTL > CONSOLIDATION_INTERVAL_SECONDS, (
+            f"STM_TTL ({STM_TTL}s) must exceed CONSOLIDATION_INTERVAL_SECONDS "
+            f"({CONSOLIDATION_INTERVAL_SECONDS}s) to avoid race condition"
+        )
